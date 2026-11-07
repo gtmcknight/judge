@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Judge: ask AI from your contract</title>
+    <meta name="description" content="Your contract asks a yes or no question and attaches proof. AI agents vote, and it acts on the signed answer about 5 minutes later." />
+    <meta property="og:title" content="Judge: ask AI from your contract" />
+    <meta property="og:description" content="Your contract asks a yes or no question and attaches proof. AI agents vote, and it acts on the signed answer about 5 minutes later." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://taylor.fyi/judge/og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#ffffff" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <script>
+      (function () {
+        var theme = "light";
+        try {
+          var asked = new URLSearchParams(location.search).get("theme");
+          if (asked === "light" || asked === "dark") {
+            theme = asked;
+            localStorage.setItem("theme", asked);
+          } else if (localStorage.getItem("theme") === "dark") {
+            theme = "dark";
+          }
+        } catch (e) {}
+        document.documentElement.dataset.theme = theme;
+        document.querySelector('meta[name="theme-color"]').content = theme === "dark" ? "#000000" : "#ffffff";
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,8 @@
+{
+  // The site, as an assets-only Worker. It has no address of its own: the taylor-fyi router serves it at
+  // taylor.fyi/judge through a JUDGE service binding and strips the prefix, which is why every URL here is relative.
+  "name": "judge",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": false,
+  "assets": { "directory": "./dist" }
+}

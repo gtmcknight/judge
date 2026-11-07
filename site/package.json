@@ -1,0 +1,29 @@
+{
+  "name": "judge-site",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 3700 --strictPort",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 3701 --strictPort",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@coinbase/wallet-sdk": "^4.4.0",
+    "@fontsource-variable/inter": "5.3.0",
+    "@fontsource/ibm-plex-mono": "5.3.0",
+    "@tanstack/react-query": "5.105.3",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "viem": "2.57.16",
+    "wagmi": "3.7.11"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.2.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.5"
+  }
+}

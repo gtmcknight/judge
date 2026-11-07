@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "launchId": "local",
+  "chainId": 11155111,
+  "sourceCommit": "local",
+  "attestationHash": "local",
+  "contracts": [
+    { "name": "Judge", "address": "0x4958501caedc8e3824c8b6e09eb449f5c97dbe1d", "abiHash": "local", "abiPath": "abi/Judge.json" }
+  ],
+  "assets": [],
+  "network": {
+    "chainId": 11155111,
+    "name": "Sepolia",
+    "testnet": true,
+    "rpcUrls": ["https://ethereum-sepolia-rpc.publicnode.com", "https://rpc.sepolia.ethpandaops.io", "https://sepolia.rpc.sentio.xyz"],
+    "explorer": "https://sepolia.etherscan.io",
+    "nativeCurrency": { "name": "Sepolia Ether", "symbol": "ETH", "decimals": 18 },
+    "faucets": [],
+    "uniswapV4": {
+      "poolManager": "0xe03a1074c86cfedd5c142c4f04f1a1536e203543",
+      "universalRouter": "0x3a9d48ab9751398bbfa63ad67599bb04e4bdf98b",
+      "quoter": "0x61b3f2011a92d183c7dbadbda940a7555ccf9227",
+      "stateView": "0xe1dd9c3fa50edb962e442f60dfbc432e24537e4c",
+      "positionManager": "0x429ba70129df741b2ca2a85bc3a2a3328e5c09b4",
+      "permit2": "0x000000000022d473030f116ddee9f6b43ac78ba3"
+    }
+  }
+}
