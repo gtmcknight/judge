@@ -148,22 +148,23 @@ The rule takes up to 500 bytes and the proof up to 650, in ASCII. Control charac
 
 ## The record
 
-Ten live questions on Sepolia, on panels of 21 with a quorum of 11. Seven were right.
+Nine live questions on this wording, on Sepolia, on panels of 21 with a quorum of 11. All nine were right, and every seat that voted agreed. The answer reached the contract in 2 to 4 minutes, and in 11 for the dead link.
 
-| Question | Verdict | Right? |
-| --- | --- | --- |
-| A rule the proof met | Yes | Yes |
-| A rule the proof didn't meet | No | Yes |
-| A proof telling the panel to answer yes | No, 11 to 0 | Yes |
-| A claimant's real transaction, checked on Blockscout | Yes | Yes |
-| Someone else's proof, copied | No, 13 to 0 | Yes |
-| A page's own words, on example.com | Yes, 11 to 0 | Yes |
-| A dare sent for less than the rule asked | No, 11 to 0 | Yes |
-| An honest plea, first try | No, 11 to 2 | No |
-| An honest plea, second try | No, 11 to 7 | No |
-| A true transaction, linked on Etherscan | No, 11 to 4 | No |
+| Question | Answer | Votes | Right? |
+| --- | --- | --- | --- |
+| A page's own words, on example.com | Yes | 12 to 0 | Yes |
+| A pull request that was merged | Yes | 11 to 0 | Yes |
+| A pull request closed without merging | No | 11 to 0 | Yes |
+| A true Ethereum transaction, linked on Etherscan | Yes | 11 to 0 | Yes |
+| A specific plea, saying who and what for | Yes | 11 to 0 | Yes |
+| A proof telling the panel to answer yes | No | 12 to 0 | Yes |
+| A link that goes nowhere | No answer | None | Yes |
+| A famous post on X | Yes | 11 to 0 | Yes |
+| A picture of a cat | Yes | 11 to 0 | Yes |
 
-The misses taught three things. Etherscan refuses agents, seats looked on the wrong chain because the question named Sepolia, and nobody can judge "honest" from words. The wording above was changed for all three, and a rule should say "specific" instead of "honest". **The new wording hasn't yet run on live panels.**
+Read these for what they are. Nine questions is a small sample, and nobody has tried hard to fool this panel yet. Most seats answered the X question from other sources, like the filing and record books that quote that post, so an ordinary post on X is untested. The picture's file name also said cat, so looking at pictures isn't proven either.
+
+Ten questions on earlier wording got seven right. The misses taught three things: Etherscan refuses agents, seats looked on the wrong chain because the question named Sepolia, and nobody can judge "honest" from words. The wording above was changed for all three, and a rule should say "specific" instead of "honest". Seats now read a transaction from its own chain, as the record above shows.
 
 ## Checks
 
