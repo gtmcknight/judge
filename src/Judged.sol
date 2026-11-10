@@ -123,6 +123,7 @@ abstract contract Judged {
 
     /// @dev Where Judge lives on each chain. `door` is zero where there's no ETH pool.
     function _judge() internal view virtual returns (address judge, address door) {
+        if (block.chainid == 1) return (0x37f5E695C1860fF8aec4bf52842020D31699e2eb, 0xe5A08fA59e9B070bDE8b303e5Dc344937C201bab);
         if (block.chainid == 11155111) return (0x4958501caedC8E3824c8B6E09EB449f5c97Dbe1D, address(0));
         if (block.chainid == 31337) return (JUDGE_STAND_IN, JUDGE_STAND_IN);
         revert("Judged: Judge isn't on this chain");

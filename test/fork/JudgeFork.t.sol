@@ -54,6 +54,37 @@ contract JudgeForkTest is Test {
         _start(1, 0xD34a99Bc0f67aE1bbd63C660e6d0b0dd03E263B7);
         _payingWithEth();
         _payingWithTheToken();
+        _judgedOnEthereum();
+    }
+
+    /// @dev `Judged` as a dev gets it on Ethereum, with no pointing: the addresses in the file are the launched
+    /// `Judge` and door. The real attester's key signs only real answers, so the fork ends the question unsigned.
+    function _judgedOnEthereum() internal {
+        Judge real = Judge(0x37f5E695C1860fF8aec4bf52842020D31699e2eb);
+        JudgeEthDoor door = JudgeEthDoor(payable(0xe5A08fA59e9B070bDE8b303e5Dc344937C201bab));
+        assertEq(address(door.judge()), address(real), "the door asks the launched Judge");
+        assertEq(real.panelSize(), 100);
+        assertEq(real.quorum(), 51);
+        EggDare dare = new EggDare();
+        vm.deal(address(dare), 0.2 ether);
+        uint256 treasuryBefore = token.balanceOf(TREASURY);
+        uint256 claimerBefore = alice.balance;
+        uint256 before = real.caseCount();
+        vm.prank(alice);
+        dare.claim{value: 0.002 ether}(PROOF);
+        uint256 id = real.caseCount();
+        assertEq(id, before + 1, "one question on the launched Judge");
+        assertEq(token.balanceOf(TREASURY) - treasuryBefore, PRICE, "the treasury got one price");
+        assertLt(claimerBefore - alice.balance, 0.002 ether, "the change came back");
+        assertEq(address(dare).balance, 0.2 ether, "the pot paid nothing");
+
+        vm.expectRevert("Judged: still voting");
+        dare.settle(id);
+        bytes32 request = _lastRequest();
+        vm.prank(WRITER);
+        INTAKE.complete(request, 1, bytes32(0), "intake read", abi.encode(request, uint8(1), bytes32("body_refused"), uint16(0), uint16(0), bytes("")));
+        dare.settle(id);
+        assertEq(address(dare).balance, 0.2 ether, "no answer pays nobody");
     }
 
     function test_sepolia() public {

@@ -178,9 +178,10 @@ Ten questions on earlier wording got seven right. The misses taught three things
 
 | Chain | `Judge` | Token | Panel |
 | --- | --- | --- | --- |
+| Ethereum | [`0x37f5e695c1860ff8aec4bf52842020d31699e2eb`](https://etherscan.io/address/0x37f5e695c1860ff8aec4bf52842020d31699e2eb) | IMD, or ETH through the door at [`0xe5a08fa59e9b070bde8b303e5dc344937c201bab`](https://etherscan.io/address/0xe5a08fa59e9b070bde8b303e5dc344937c201bab) | 100 seats, quorum 51 |
 | Sepolia, for testing | [`0x4958501caedc8e3824c8b6e09eb449f5c97dbe1d`](https://sepolia.etherscan.io/address/0x4958501caedc8e3824c8b6e09eb449f5c97dbe1d) | imdTEST | 21 seats, quorum 11 |
 
-Ethereum comes next, at 100 seats and a quorum of 51, with its address added to `Judged`. On Ethereum `Judged` reverts with `Judge isn't on this chain` until then.
+IMD's swarm deployed both Ethereum contracts on 2026-11-10 in [launch 3187](https://explorer.imd.fun/jobs/d60032fc-9747-4900-9884-4e0614187089), unchanged from this repository at `72ba6cd`: the runtime code matches this build byte for byte apart from its immutables. Its reviewers added 42 tests and found nothing critical or high.
 
 ## Building
 

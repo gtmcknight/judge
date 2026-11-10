@@ -623,6 +623,12 @@ contract JudgedStandInTest is Test, JudgedTest {
         (judge, door) = where.where();
         assertEq(judge, 0x4958501caedC8E3824c8B6E09EB449f5c97Dbe1D);
         assertEq(door, address(0));
+
+        // the launch of 2026-11-10, as IMD's swarm deployed it
+        vm.chainId(1);
+        (judge, door) = where.where();
+        assertEq(judge, 0x37f5E695C1860fF8aec4bf52842020D31699e2eb);
+        assertEq(door, 0xe5A08fA59e9B070bDE8b303e5Dc344937C201bab);
     }
 
     function test_aYesStaysYesAfterTheDay() public {
