@@ -4,7 +4,7 @@ import { useConfig, useConnection, usePublicClient } from "wagmi";
 import { readContract } from "wagmi/actions";
 import { erc20Abi, site } from "./deployment";
 import { useJudge } from "./cases";
-import { quoteEth, useAsk, type Pay, type Stage } from "./ask";
+import { ethToSend, quoteEth, useAsk, type Pay, type Stage } from "./ask";
 import { EXAMPLES, MAX_PROOF, MAX_RULE, amount, problemWith, straighten } from "./text";
 import { useWalletSheet } from "./wallet";
 
@@ -38,8 +38,11 @@ export function AskForm({ onOpened }: { onOpened: (id: number) => void }) {
 
   const pay: Pay = picked ?? (paysInEth ? "eth" : "imd");
 
+  // A mouse reader can start typing at once. On a phone the keyboard would cover the page,
+  // and a tab opened from the keyboard keeps its focus.
   useEffect(() => {
-    if (!ruleBox.current?.value) ruleBox.current?.focus();
+    const fresh = !document.activeElement || document.activeElement === document.body;
+    if (fresh && matchMedia("(pointer: fine)").matches && !ruleBox.current?.value) ruleBox.current?.focus();
   }, []);
 
   // The draft lives in the URL, so it survives a reload and the jump into a wallet's own browser.
@@ -89,10 +92,20 @@ export function AskForm({ onOpened }: { onOpened: (id: number) => void }) {
     void refetchAllowed();
   }, [stage, address, refetchHeld, refetchAllowed]);
 
+  // ETH is the only way to pay until the wallet holds enough IMD to pay in it.
+  const imdHeld = useQuery({
+    queryKey: ["held", address, "imd", judge?.asset],
+    enabled: !!address && !!judge && paysInEth,
+    refetchInterval: 30_000,
+    queryFn: () => readContract(config, { address: judge!.asset, abi: erc20Abi, functionName: "balanceOf", args: [address!] }),
+  });
+  const offerImd = paysInEth && (picked === "imd" || (!!judge && imdHeld.data !== undefined && imdHeld.data >= judge.price));
+
   const needsApproval = pay === "imd" && !!judge && allowed.data !== undefined && allowed.data < judge.price;
   const busy = stage !== "idle";
 
-  const price = pay === "eth" ? (quote.data !== undefined ? `about ${amount(quote.data)} ETH` : "in ETH") : judge ? `${amount(judge.price)} ${symbol}` : `in ${symbol}`;
+  // exactly what the wallet will be asked to send
+  const price = pay === "eth" ? (quote.data !== undefined ? `${amount(ethToSend(quote.data))} ETH` : "in ETH") : judge ? `${amount(judge.price)} ${symbol}` : `in ${symbol}`;
 
   const label = stage === "approve" ? `Approve ${judge ? amount(judge.price) : ""} ${symbol} in your wallet` : (stageWords[stage] ?? `Pay ${price}`);
 
@@ -186,7 +199,7 @@ export function AskForm({ onOpened }: { onOpened: (id: number) => void }) {
             </span>
           ))}
         </span>
-        {paysInEth && (
+        {offerImd && (
           <div className="choice" role="radiogroup" aria-label="Pay in">
             <span>Pay in</span>
             {(["eth", "imd"] as const).map((option) => (
@@ -218,11 +231,9 @@ export function AskForm({ onOpened }: { onOpened: (id: number) => void }) {
         <p className="ask-line">Two confirmations: approve {symbol}, then ask.</p>
       ) : held.data !== undefined && !busy ? (
         <p className="ask-line">
-          This wallet has {amount(held.data)} {pay === "eth" ? "ETH" : symbol}. Gas is extra.
+          This wallet has {amount(held.data)} {pay === "eth" ? "ETH" : symbol}.
         </p>
-      ) : (
-        <p className="ask-line">Gas is extra.</p>
-      )}
+      ) : null}
     </form>
   );
 }

@@ -6,7 +6,7 @@ Ask a yes or no question and attach proof. A panel of AI agents votes, and about
 
 ## How to use it
 
-**With your AI.** Paste this into Claude Code, Cursor or any AI that writes code, and change the last line to whatever you want. It builds and tests the contract for free, and nothing goes live and no money moves until you say so.
+**For your agent.** Paste this into Claude Code, Cursor or any AI that writes code, and change the last line to whatever you want. It builds and tests the contract for free, and nothing goes live and no money moves until you say so.
 
 ```
 Read and follow https://taylor.fyi/judge/skill.md
@@ -14,7 +14,7 @@ Read and follow https://taylor.fyi/judge/skill.md
 Build me a contract that holds 1 ETH and pays alice when their article is published on my site.
 ```
 
-**By hand.** The rest of this page.
+**In a contract.** The rest of this page.
 
 ## Add it
 

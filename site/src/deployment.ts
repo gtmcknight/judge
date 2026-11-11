@@ -1,7 +1,7 @@
 import { defineChain, parseAbi, type Abi, type Address } from "viem";
 
 /** `imd-deployment.json`: what IMD's deployment handed this site. Everything chain-specific reads from it. */
-type Deployment = {
+export type Deployment = {
   chainId: number;
   contracts: Array<{ name: string; address: Address; abiPath: string }>;
   network: {
@@ -36,8 +36,19 @@ const json = async <T,>(path: string): Promise<T> => {
   return (await response.json()) as T;
 };
 
+/** The contracts this site reads, by name. */
+const NAMES = ["Judge", "JudgeEthDoor"];
+
 export async function loadSite(): Promise<Site> {
   const deployment = await json<Deployment>("./imd-deployment.json");
+  // the ABIs come down together, not one after another
+  const paths = deployment.contracts.filter((c) => NAMES.includes(c.name)).map((c) => c.abiPath);
+  const abis = Object.fromEntries(await Promise.all(paths.map(async (path) => [path, await json<Abi>(`./${path}`)] as const)));
+  return siteFrom(deployment, abis);
+}
+
+/** The site's settings from a deployment and its ABIs. The build's prerender passes them in from disk. */
+export function siteFrom(deployment: Deployment, abis: Record<string, Abi>): Site {
   const judge = deployment.contracts.find((c) => c.name === "Judge");
   if (!judge) throw new Error("no Judge in the deployment");
   const door = deployment.contracts.find((c) => c.name === "JudgeEthDoor");
@@ -50,8 +61,8 @@ export async function loadSite(): Promise<Site> {
     rpcUrls: network.rpcUrls,
     quoter: network.uniswapV4.quoter,
     judge: judge.address,
-    abi: await json<Abi>(`./${judge.abiPath}`),
-    door: door ? { address: door.address, abi: await json<Abi>(`./${door.abiPath}`) } : null,
+    abi: abis[judge.abiPath]!,
+    door: door ? { address: door.address, abi: abis[door.abiPath]! } : null,
     chain: defineChain({
       id: deployment.chainId,
       name: network.name,
@@ -69,9 +80,16 @@ export function site(): Site {
   return loaded;
 }
 
-export const IMD_API = "https://api.imd.fun";
+export { IMD_API } from "./imd";
 export const IMD_EXPLORER = "https://explorer.imd.fun";
 export const REPOSITORY = "https://github.com/gtmcknight/judge";
+
+/** Where a question has its own address, with a link preview that names its answer. */
+export const HOME = "https://taylor.fyi/judge/";
+
+/** The link to share for a question: its own address on taylor.fyi, the page's own hash route anywhere else. */
+export const caseLink = (id: number) =>
+  location.href.startsWith(HOME) ? `${HOME}case/${id}` : `${location.origin}${location.pathname}#/case/${id}`;
 
 export const erc20Abi = parseAbi([
   "function balanceOf(address) view returns (uint256)",

@@ -9,6 +9,11 @@ import { App } from "./App";
 import { loadSite } from "./deployment";
 import { WalletProvider, configFor } from "./wallet";
 
+// A question's own address (taylor.fyi/judge/case/1, where its link preview lives) becomes the hash
+// route the page runs on. The server set a base of ../, so the page's files and links still resolve.
+const asked = /\/case\/(\d+)\/?$/.exec(location.pathname);
+if (asked && !location.hash) history.replaceState(null, "", new URL(`../#/case/${asked[1]}`, location.href));
+
 const root = createRoot(document.getElementById("root")!);
 
 class Boundary extends Component<{ children: ReactNode }, { broken: boolean }> {

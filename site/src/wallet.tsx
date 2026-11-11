@@ -1,9 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { createConfig, fallback, http, useConnect, useConnection, useConnectors, useDisconnect, useSwitchChain, type Connector } from "wagmi";
+import { createConfig, fallback, http, useConnect, useConnection, useConnectors, type Connector } from "wagmi";
 import { coinbaseWallet, injected } from "wagmi/connectors";
 import type { Site } from "./deployment";
-import { site } from "./deployment";
-import { short } from "./text";
 import { WALLET_MARKS } from "./wallet-marks";
 
 export const SITE_NAME = "Judge";
@@ -137,59 +135,3 @@ function ConnectSheet({ onClose }: { onClose: () => void }) {
 }
 
 /** The header's control: Connect, the address, or the way back to the right chain. */
-export function WalletButton() {
-  const { open } = useWalletSheet();
-  const { address, isConnected, chainId } = useConnection();
-  const { mutate: disconnect } = useDisconnect();
-  const { mutate: switchChain, isPending } = useSwitchChain();
-  const [menu, setMenu] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-  const { chainId: wanted, chainName } = site();
-
-  useEffect(() => {
-    if (!menu) return;
-    const close = (e: Event) => {
-      if (e instanceof KeyboardEvent ? e.key === "Escape" : !box.current?.contains(e.target as Node)) setMenu(false);
-    };
-    addEventListener("pointerdown", close);
-    addEventListener("keydown", close);
-    return () => {
-      removeEventListener("pointerdown", close);
-      removeEventListener("keydown", close);
-    };
-  }, [menu]);
-
-  if (!isConnected || !address) {
-    return (
-      <button className="plain-button" onClick={open}>
-        Connect
-      </button>
-    );
-  }
-  if (chainId !== wanted) {
-    return (
-      <button className="plain-button" onClick={() => switchChain({ chainId: wanted })}>
-        {isPending ? "Switching…" : `Switch to ${chainName}`}
-      </button>
-    );
-  }
-  return (
-    <div className="wallet-menu" ref={box}>
-      <button className="plain-button mono" aria-expanded={menu} onClick={() => setMenu(!menu)}>
-        {short(address)}
-      </button>
-      {menu && (
-        <div className="popover">
-          <button
-            onClick={() => {
-              setMenu(false);
-              disconnect({});
-            }}
-          >
-            Disconnect
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}

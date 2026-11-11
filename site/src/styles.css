@@ -8,6 +8,14 @@
   --no: #f87171;
   --solid: #f5f5f5;
   --on-solid: #000;
+  --tile-1: #0f1b33;
+  --tile-1-ink: #8ab4ff;
+  --tile-2: #1c1535;
+  --tile-2-ink: #b8a4ff;
+  --tile-3: #0b2329;
+  --tile-3-ink: #6fd2e5;
+  --tile-4: #2b1e0b;
+  --tile-4-ink: #f6bd5e;
   --sans: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -24,6 +32,14 @@
   --no: #dc2626;
   --solid: #0a0a0a;
   --on-solid: #fff;
+  --tile-1: #edf3ff;
+  --tile-1-ink: #1d4ed8;
+  --tile-2: #f3eeff;
+  --tile-2-ink: #6d28d9;
+  --tile-3: #e6f6fa;
+  --tile-3-ink: #0e7490;
+  --tile-4: #fff3e0;
+  --tile-4-ink: #b45309;
   color-scheme: light;
 }
 
@@ -84,10 +100,6 @@ button:disabled {
   outline-offset: 2px;
 }
 
-.mono {
-  font-family: var(--mono);
-}
-
 .fatal {
   padding: 32px 16px;
   max-width: 40ch;
@@ -133,52 +145,6 @@ button:disabled {
   transition: color 150ms ease;
 }
 
-.plain-button {
-  height: 44px;
-  padding: 0 16px;
-  font-size: 14px;
-  font-weight: 500;
-  border-radius: 10px;
-  transition: color 150ms ease;
-}
-
-.plain-button.mono {
-  font-weight: 400;
-}
-
-.wallet-menu {
-  position: relative;
-}
-
-.popover {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  z-index: 10;
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 4px;
-  transform-origin: top right;
-  animation: grow 150ms var(--out);
-}
-
-.popover button {
-  display: block;
-  white-space: nowrap;
-  padding: 12px 16px;
-  font-size: 14px;
-  font-weight: 500;
-  border-radius: 8px;
-}
-
-@keyframes grow {
-  from {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-}
-
 /* ---- the first screen ---- */
 
 h1 {
@@ -189,7 +155,7 @@ h1 {
 }
 
 .lede {
-  margin-top: 10px;
+  margin-top: 12px;
   color: var(--ink-2);
   text-wrap: pretty;
 }
@@ -216,7 +182,7 @@ h1 {
 .copy {
   flex: none;
   min-height: 44px;
-  margin-right: -10px;
+  margin-right: -12px;
   font-size: 14px;
   font-weight: 500;
   transition: transform 160ms var(--out);
@@ -225,7 +191,7 @@ h1 {
 .copy span {
   display: inline-block;
   min-width: 54px;
-  padding: 4px 10px;
+  padding: 4px 12px;
   border-radius: 999px;
   text-align: center;
   text-decoration: underline;
@@ -305,59 +271,81 @@ h1 {
   color: var(--ink-2);
 }
 
-/* ---- how to use it ---- */
+/* ---- the three ways in ---- */
 
-.howto {
-  margin-top: 40px;
-}
-
-.howto-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.howto-head h2 {
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.seg {
+/* the pill starts at the column's edge, like the tiles above it */
+.tabs {
+  position: relative;
   display: flex;
   gap: 4px;
 }
 
-.seg button {
+/* grey fill means selected */
+.tab-pill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--line);
+  pointer-events: none;
+}
+
+.tab-pill.is-placed {
+  transition:
+    transform 200ms var(--out),
+    width 200ms var(--out);
+}
+
+.tabs button {
+  position: relative;
+  flex: none;
   min-height: 36px;
   padding: 0 12px;
-  border: 1px solid transparent;
   border-radius: 999px;
   font-size: 14px;
   font-weight: 500;
+  white-space: nowrap;
   color: var(--ink-2);
   transition:
     color 150ms ease,
-    border-color 150ms ease,
     transform 160ms var(--out);
 }
 
-.seg button[aria-selected="true"] {
+.tabs button[aria-selected="true"] {
   color: var(--ink);
-  border-color: var(--open);
 }
 
-.seg button:active {
+.tabs button:active {
   transform: scale(0.97);
+}
+
+/* the three share the row on the narrowest phones */
+@media (max-width: 360px) {
+  .tabs {
+    gap: 0;
+  }
+
+  .tabs button {
+    flex: 1 1 auto;
+    padding: 0 4px;
+  }
+}
+
+@media (hover: hover) {
+  .tabs button:hover {
+    color: var(--ink);
+  }
+}
+
+.tab-panel {
+  animation: fade 150ms ease;
 }
 
 .steps {
   margin: 24px 0 0;
   padding: 0;
   list-style: none;
-  animation: fade 150ms ease;
 }
 
 .st {
@@ -423,8 +411,8 @@ h1 {
 
 .prompt {
   margin-top: 12px;
-  padding: 16px 20px 8px;
-  border: 1px solid var(--open);
+  padding: 16px 20px;
+  border: 1px solid var(--line);
   border-radius: 20px;
   transition: border-color 150ms ease;
 }
@@ -433,8 +421,23 @@ h1 {
   border-color: var(--ink-2);
 }
 
-.st .prompt-fixed {
+/* the agent tab sits as far under the tabs as the contract tab's steps */
+.agent {
+  margin-top: 24px;
+}
+
+.agent-line {
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+.prompt-fixed {
   margin: 0 0 8px;
+  color: var(--ink-2);
+}
+
+.prompt-fixed a {
+  text-decoration-color: var(--ink-2);
 }
 
 .prompt textarea {
@@ -442,6 +445,7 @@ h1 {
   width: 100%;
   padding: 0;
   border: 0;
+  border-radius: 0;
   outline: 0;
   resize: none;
   overflow: hidden;
@@ -450,14 +454,24 @@ h1 {
   line-height: 1.5;
 }
 
-.prompt-end {
-  display: flex;
-  justify-content: flex-end;
+/* Copy's pill sits inside the box's padding, as far from the edge as the text, and as tall as the tabs */
+.prompt .copy {
+  min-height: 36px;
+  margin-right: 0;
 }
 
-.st .ideas {
+/* the examples on the left and Copy on the right, the box's last row */
+.prompt-end {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-top: 8px;
+}
+
+.ideas {
   font-size: 14px;
+  color: var(--ink-2);
 }
 
 .ideas .link {
@@ -476,10 +490,16 @@ h1 {
   position: absolute;
   top: 2px;
   right: 20px;
+  background: var(--bg);
 }
 
 .code-box .step-code {
   margin: 0;
+}
+
+/* the first line keeps clear of Copy and Copied; a longer word covers the code instead of crossing it */
+.code-box .ln:first-child {
+  padding-right: 56px;
 }
 
 .code-one {
@@ -498,19 +518,6 @@ h1 {
 .code-one > .copy {
   position: static;
   font-family: var(--sans);
-}
-
-.try-line {
-  margin-top: 40px;
-  padding: 24px 0 12px;
-  border-top: 1px solid var(--line);
-  color: var(--ink-2);
-}
-
-.try-line a {
-  color: var(--ink);
-  text-decoration-color: var(--ink-2);
-  text-underline-offset: 3px;
 }
 
 /* ---- the rows ---- */
@@ -541,16 +548,11 @@ h1 {
 }
 
 
-.frame-try svg {
-  flex: none;
-  color: var(--ink-2);
-}
-
 .pill {
   display: grid;
   place-items: center;
   width: 100%;
-  min-height: 48px;
+  min-height: 44px;
   padding: 0 16px;
   font-weight: 500;
   background: var(--solid);
@@ -687,15 +689,173 @@ h1 {
   color: var(--ink);
 }
 
-/* ---- cases ---- */
+/* ---- sections: the latest answer, what it's good for, how to use it, earlier questions ---- */
 
-.cases {
+.section {
   margin-top: 48px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
 }
 
-.cases h2 {
-  font-size: 16px;
+.section > h2 {
+  margin-bottom: 16px;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+/* ---- cases ---- */
+
+/* the prerendered home top waits out a question's page */
+[data-case] [data-shell] main {
+  visibility: hidden;
+}
+
+/* ---- the latest answer ---- */
+
+.latest {
+  display: block;
+  padding: 16px 20px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  text-decoration: none;
+  transition: border-color 150ms ease;
+}
+
+@media (hover: hover) {
+  .latest:hover {
+    border-color: var(--open);
+  }
+}
+
+/* the question is the card's headline: up to three even lines */
+.latest-rule {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  font-size: 24px;
   font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.latest-vote {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.latest-vote b {
+  flex: none;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.latest-vote .seats {
+  flex: 1;
+  margin-top: 0;
+}
+
+.seats.seats-fill {
+  grid-template-columns: repeat(50, 1fr);
+  gap: 4px;
+}
+
+.latest-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+  margin-top: 12px;
+  font-size: 14px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  .seats.seats-fill {
+    grid-template-columns: repeat(25, 1fr);
+  }
+}
+
+/* where it lives: the chain and the contract, under the line that says what it does */
+.chain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  font-size: 14px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.chain a {
+  color: var(--ink);
+}
+
+/* ---- good for ---- */
+
+/* the one place with color: each use on its own tile, so what it's for reads apart from how */
+.uses {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 24px 0 0;
+}
+
+.uses > div {
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--tile);
+}
+
+.uses [data-hue="1"] {
+  --tile: var(--tile-1);
+  --tile-ink: var(--tile-1-ink);
+}
+
+.uses [data-hue="2"] {
+  --tile: var(--tile-2);
+  --tile-ink: var(--tile-2-ink);
+}
+
+.uses [data-hue="3"] {
+  --tile: var(--tile-3);
+  --tile-ink: var(--tile-3-ink);
+}
+
+.uses [data-hue="4"] {
+  --tile: var(--tile-4);
+  --tile-ink: var(--tile-4-ink);
+}
+
+/* small type, so eight fit and every name stays on one line */
+.uses > div {
+  font-size: 14px;
+}
+
+.uses dt {
+  font-weight: 700;
+  color: var(--tile-ink);
+}
+
+.uses dd {
+  margin: 2px 0 0;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+@media (max-width: 640px) {
+  .uses {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .aside {
@@ -759,10 +919,37 @@ h1 {
   color: var(--ink-2);
 }
 
+/* set off like the sections above it */
 .foot {
-  padding: 32px 0 40px;
+  margin-top: 48px;
+  padding: 24px 0 48px;
+  border-top: 1px solid var(--line);
   font-size: 14px;
   color: var(--ink-2);
+}
+
+/* the facts a developer checks, as a list: label, then the plain answer */
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 24px;
+  margin: 0;
+}
+
+.facts > div {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: span 2;
+}
+
+.facts dt {
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.facts dd {
+  margin: 0;
+  text-wrap: pretty;
 }
 
 .foot a {
@@ -797,11 +984,12 @@ h1 {
 
 .case-rule {
   margin-top: 16px;
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 500;
   line-height: 1.3;
   letter-spacing: -0.01em;
-  text-wrap: pretty;
+  /* a question reads like a headline: lines of even length, not one split mid-name */
+  text-wrap: balance;
   overflow-wrap: anywhere;
 }
 
@@ -817,7 +1005,7 @@ h1 {
 
 .seats {
   display: grid;
-  gap: 5px;
+  gap: 4px;
   margin-top: 24px;
 }
 
@@ -966,18 +1154,8 @@ h1 {
     color: var(--ink);
   }
 
-  .plain-button:hover {
-    color: var(--ink-2);
-  }
-
   .copy:hover span {
     text-decoration-color: currentColor;
-  }
-
-  .frame-try:hover > span {
-    text-decoration: underline;
-    text-decoration-color: var(--ink-2);
-    text-underline-offset: 3px;
   }
 
   a:hover,
@@ -991,8 +1169,7 @@ h1 {
     text-underline-offset: 3px;
   }
 
-  .wallet-row:hover:not(:disabled),
-  .popover button:hover {
+  .wallet-row:hover:not(:disabled) {
     background: var(--line);
   }
 }
@@ -1016,12 +1193,7 @@ h1 {
   }
 
   .prompt {
-    margin-left: -40px;
     padding-inline: 16px;
-  }
-
-  .st .ideas {
-    margin-left: -40px;
   }
 
   .row {
@@ -1066,11 +1238,14 @@ h1 {
 }
 
 @media (pointer: coarse) {
-  .seg button {
+  .tabs button {
     min-height: 44px;
   }
 
-  .st .ideas {
+  /* with the links' 12px tap padding above and below, a 20px line makes them 44px, like every other control */
+  .ideas,
+  .ask-row,
+  .case-links {
     line-height: 20px;
   }
 
@@ -1081,7 +1256,6 @@ h1 {
   .lede a,
   .frame-row a,
   .st p a,
-  .try-line a,
   .ideas .link,
   .quiet .link,
   .case-proof a,
@@ -1089,6 +1263,20 @@ h1 {
     display: inline-block;
     padding: 12px 0;
     margin: -12px 0;
+  }
+
+  /* the footer's links sit in prose: each takes its whole line as the tap area, so lines don't overlap */
+  .facts dd {
+    line-height: 24px;
+  }
+
+  .facts a {
+    padding: 0;
+    margin: 0;
+  }
+
+  .prompt .copy {
+    min-height: 44px;
   }
 
   .choice button {
@@ -1100,13 +1288,17 @@ h1 {
   .seats[data-live="true"] .seat-yes,
   .seats[data-live="true"] .seat-no,
   .verdict[data-landed="true"],
-  .sheet,
-  .popover {
+  .sheet {
     animation-name: fade;
   }
 
   .copy:active,
-  .pill:active:not(:disabled) {
+  .pill:active:not(:disabled),
+  .tabs button:active {
     transform: none;
+  }
+
+  .tab-pill.is-placed {
+    transition: none;
   }
 }

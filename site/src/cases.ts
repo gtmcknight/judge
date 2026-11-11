@@ -1,44 +1,11 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { usePublicClient } from "wagmi";
 import type { Address } from "viem";
-import { IMD_API, erc20Abi, site } from "./deployment";
+import { erc20Abi, site } from "./deployment";
+import { VERDICTS, get, search, votesOf, type PanelRecord, type Verdict, type Vote } from "./imd";
 import { parseQuestion, questionHashOf } from "./text";
 
-export const VERDICTS = ["Pending", "Yes", "No", "NoAnswer"] as const;
-export type Verdict = (typeof VERDICTS)[number];
-
-export type Vote = { seat: string; yes: boolean };
-
-export type PanelRecord = {
-  id: string;
-  status: string;
-  question: string;
-  chainId: number;
-  answerType: string;
-  window: { fromBlock: number; toBlock: number };
-  jobId: string | null;
-  createdAt: string;
-  attestedAt: string | null;
-  members?: Array<{ ok?: boolean; tokenId?: string | null; answer?: { answer?: unknown } | null }> | null;
-};
-
-async function get<T>(path: string): Promise<T> {
-  const response = await fetch(`${IMD_API}${path}`);
-  if (!response.ok) throw new Error(`IMD answered ${response.status}`);
-  return (await response.json()) as T;
-}
-
-const search = (words: string, limit: number) => get<{ requests: PanelRecord[] }>(`/oracle/requests?q=${encodeURIComponent(words)}&limit=${limit}`);
-
-function votesOf(record: PanelRecord): Vote[] {
-  const votes: Vote[] = [];
-  for (const member of record.members ?? []) {
-    if (!member.ok) continue;
-    const answer = member.answer?.answer;
-    if (answer === true || answer === false) votes.push({ seat: member.tokenId ?? "", yes: answer });
-  }
-  return votes;
-}
+export { VERDICTS, type PanelRecord, type Verdict, type Vote } from "./imd";
 
 /** What never changes on a deployed contract, plus today's price. */
 export function useJudge() {
@@ -117,10 +84,11 @@ export function useCaseRows(limit = 8) {
 }
 
 /** One case as the contract holds it: the source of truth for its verdict. */
-export function useCaseOnChain(id: number) {
+export function useCaseOnChain(id: number, enabled = true) {
   const client = usePublicClient();
   return useQuery({
     queryKey: ["case", id],
+    enabled,
     // A public node can lag a block or two behind the wallet's, so a case this browser just opened
     // keeps being read even while the node says it doesn't exist.
     refetchInterval: (query) => (query.state.data?.verdict === "Pending" && (query.state.data.askedAt || rememberedCase(id)) ? 6_000 : false),

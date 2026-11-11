@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { IMD_EXPLORER } from "./deployment";
+import { IMD_EXPLORER, caseLink } from "./deployment";
 import { rememberedCase, useCaseOnChain, useCasePanel, useJudge, type CasePanel, type Verdict, type Vote } from "./cases";
 import { CaseRows } from "./App";
-import { copyText, timeAgo, took } from "./text";
+import { headline } from "./imd";
+import { timeAgo, took } from "./text";
+import { copyText } from "./clipboard";
 
-/** Seats fill from the start for yes and from the end for no, so the side that crosses the middle wins. */
-function Seats({ panelSize, votes, live }: { panelSize: number; votes: Vote[]; live: boolean }) {
+/** Seats fill from the start for yes and from the end for no, so the side that crosses the middle wins.
+ * `fill` spreads a big panel across the width it sits in. */
+export function Seats({ panelSize, votes, live, fill }: { panelSize: number; votes: Vote[]; live: boolean; fill?: boolean }) {
   const yes = votes.filter((v) => v.yes);
   const no = votes.filter((v) => !v.yes);
   const columns = panelSize <= 25 ? panelSize : 20;
@@ -19,11 +22,12 @@ function Seats({ panelSize, votes, live }: { panelSize: number; votes: Vote[]; l
     seated.current = { yes: yes.length, no: no.length };
   });
 
+  const spread = !!fill && panelSize > 25;
   return (
     <div
-      className="seats"
+      className={spread ? "seats seats-fill" : "seats"}
       data-live={live}
-      style={{ gridTemplateColumns: `repeat(${columns}, 1fr)`, maxWidth: columns * 21 - 5 }}
+      style={spread ? undefined : { gridTemplateColumns: `repeat(${columns}, 1fr)`, maxWidth: columns * 20 - 4 }}
       role="img"
       aria-label={`${yes.length} yes, ${no.length} no, of ${panelSize} seats`}
     >
@@ -63,7 +67,6 @@ function Proof({ text }: { text: string }) {
   );
 }
 
-const headline: Record<Verdict, string> = { Pending: "Voting", Yes: "Yes", No: "No", NoAnswer: "No answer" };
 
 /** Past this, "usually 2 to 5 minutes" has stopped being true for this case. */
 const OVERDUE_SECONDS = 600;
@@ -186,7 +189,7 @@ export function CasePage({ id }: { id: number }) {
         {shown && judge ? statusLine(shown, votes, judge.panelSize, judge.quorum, words, overdue) : " "}
       </p>
       <div className="case-links">
-        <ShareButton line={shown && rule ? `${headline[shown]}: ${rule}` : ""} />
+        <ShareButton id={id} line={shown && rule ? `${headline[shown]}: ${rule}` : ""} />
         {words?.record.jobId && <a href={`${IMD_EXPLORER}/jobs/${words.record.jobId}`}>See every answer</a>}
         <a href="#/ask">Ask your own</a>
         <span className="case-meta">
@@ -200,7 +203,7 @@ export function CasePage({ id }: { id: number }) {
 }
 
 /** A case's own line and link: the phone's share sheet where there is one, the clipboard elsewhere. */
-function ShareButton({ line }: { line: string }) {
+function ShareButton({ id, line }: { id: number; line: string }) {
   const [done, setDone] = useState<"" | "Copied" | "Couldn't copy">("");
   useEffect(() => {
     if (!done) return;
@@ -212,7 +215,7 @@ function ShareButton({ line }: { line: string }) {
     <button
       className="link"
       onClick={() => {
-        const url = location.origin + location.pathname + location.hash;
+        const url = caseLink(id);
         const copy = () => void copyText(line ? `${line}\n${url}` : url).then((ok) => setDone(ok ? "Copied" : "Couldn't copy"));
         if (!canShare) return copy();
         void navigator.share({ text: line, url }).catch((e: Error) => {

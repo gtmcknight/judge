@@ -1,28 +1,28 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { usePublicClient } from "wagmi";
 import { flushSync } from "react-dom";
-import { quoteEth } from "./ask";
 import { REPOSITORY, site } from "./deployment";
-import { useCaseCount, useCaseRows, useJudge, type Verdict } from "./cases";
+import { useCaseCount, useCaseOnChain, useCasePanel, useCaseRows, useJudge, type Verdict } from "./cases";
 import { AskForm } from "./AskPanel";
-import { CasePage } from "./CasePage";
+import { CasePage, Seats } from "./CasePage";
+import { headline } from "./imd";
 import { CONTRACT, IDEAS, INSTALL, TEST, asFile } from "./snippet";
-import { amount, copyText, timeAgo } from "./text";
-import { WalletButton } from "./wallet";
+import { short, timeAgo, took } from "./text";
+import { copyText } from "./clipboard";
 
-type Route = { page: "home"; ask: boolean } | { page: "case"; id: number };
+type Tab = "agent" | "contract" | "ask";
+type Route = { page: "home"; tab: Tab } | { page: "case"; id: number };
 
 function readRoute(): Route {
   const match = /^#\/case\/(\d+)$/.exec(location.hash);
   if (match?.[1]) return { page: "case", id: Number(match[1]) };
-  return { page: "home", ask: location.hash.startsWith("#/ask") };
+  const tab: Tab = location.hash.startsWith("#/ask") ? "ask" : location.hash.startsWith("#/contract") ? "contract" : "agent";
+  return { page: "home", tab };
 }
 
 /** Set when a case opens from the form: the words just typed travel to where they now live. */
 let travelNext = false;
 
-/** Where Try it leads: back to the words typed before looking at the code. */
+/** Where Ask here leads: back to the words typed before looking at another tab. */
 let lastAsk = "#/ask";
 
 function useRoute(): Route {
@@ -31,12 +31,13 @@ function useRoute(): Route {
     let shown = readRoute();
     const update = () => {
       const next = readRoute();
+      // a tab changes only what is under the tabs, so the page stays where the reader is
+      const sameHome = next.page === "home" && shown.page === "home";
       const apply = () => {
         flushSync(() => setRoute(next));
-        scrollTo(0, 0);
+        if (!sameHome) scrollTo(0, 0);
       };
-      const swaps = next.page === "home" && shown.page === "home" && next.ask !== shown.ask;
-      const travel = (travelNext || swaps) && "startViewTransition" in document && !matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const travel = travelNext && "startViewTransition" in document && !matchMedia("(prefers-reduced-motion: reduce)").matches;
       travelNext = false;
       shown = next;
       if (travel) document.startViewTransition(apply);
@@ -46,35 +47,6 @@ function useRoute(): Route {
     return () => removeEventListener("hashchange", update);
   }, []);
   return route;
-}
-
-function ThemeButton() {
-  const [dark, setDark] = useState(() => document.documentElement.dataset.theme === "dark");
-  const flip = () => {
-    const next = dark ? "light" : "dark";
-    document.documentElement.dataset.theme = next;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", next === "dark" ? "#000000" : "#ffffff");
-    try {
-      localStorage.setItem("theme", next);
-    } catch {
-      // private windows may refuse; the page still flips
-    }
-    setDark(!dark);
-  };
-  return (
-    <button className="icon-button" aria-label={dark ? "Switch to day" : "Switch to night"} onClick={flip}>
-      {dark ? (
-        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-          <circle cx="8" cy="8" r="3.2" fill="currentColor" />
-          <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6L13 13M13 3l-1.4 1.4M4.4 11.6L3 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-        </svg>
-      ) : (
-        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-          <path d="M13.5 9.6A6 6 0 0 1 6.4 2.5a6 6 0 1 0 7.1 7.1z" fill="currentColor" />
-        </svg>
-      )}
-    </button>
-  );
 }
 
 function Header() {
@@ -92,8 +64,6 @@ function Header() {
             />
           </svg>
         </a>
-        <ThemeButton />
-        <WalletButton />
       </div>
     </header>
   );
@@ -170,22 +140,24 @@ export function CopyButton({ text, label, next, onCopied }: { text: string; labe
   );
 }
 
-export const Chevron = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-    <path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
 /** The box to paste into an AI: the fixed line that points it here, then what you want in your own words. */
+/** The line typed in the paste box, kept while the reader looks at another tab. */
+let wishDraft: string = IDEAS[0]![1];
+
 function Prompt() {
-  const [wish, setWish] = useState<string>(IDEAS[0]![1]);
+  const [wish, setShown] = useState(wishDraft);
+  const setWish = (text: string) => {
+    wishDraft = text;
+    setShown(text);
+  };
   const box = useRef<HTMLTextAreaElement>(null);
   const skill = new URL("skill.md", location.href).href;
   useLayoutEffect(() => {
     const area = box.current;
     if (!area) return;
     area.style.height = "auto";
-    area.style.height = `${area.scrollHeight}px`;
+    // the underline is a border, which scrollHeight leaves out
+    area.style.height = `${area.scrollHeight + area.offsetHeight - area.clientHeight}px`;
   });
   return (
     <>
@@ -195,26 +167,27 @@ function Prompt() {
         </p>
         <textarea ref={box} rows={1} aria-label="What you want your contract to do" spellCheck={false} value={wish} onChange={(event) => setWish(event.target.value)} />
         <div className="prompt-end">
+          <p className="ideas">
+            Try{" "}
+            {IDEAS.map(([name, text], i) => (
+              <span key={name}>
+                {i > 0 && " · "}
+                <button
+                  className="link"
+                  onClick={() => {
+                    setWish(text);
+                    // on a phone the keyboard would cover Copy
+                    if (matchMedia("(pointer: fine)").matches) box.current?.focus();
+                  }}
+                >
+                  {name}
+                </button>
+              </span>
+            ))}
+          </p>
           <CopyButton text={`Read and follow ${skill}\n\n${wish}`} label="Copy this for your AI" next />
         </div>
       </div>
-      <p className="ideas">
-        Try{" "}
-        {IDEAS.map(([name, text], i) => (
-          <span key={name}>
-            {i > 0 && " · "}
-            <button
-              className="link"
-              onClick={() => {
-                setWish(text);
-                box.current?.focus();
-              }}
-            >
-              {name}
-            </button>
-          </span>
-        ))}
-      </p>
     </>
   );
 }
@@ -226,20 +199,6 @@ function CodeBox({ lines }: { lines: string[] }) {
       <Code lines={lines} />
     </div>
   );
-}
-
-function Price() {
-  const { data: judge } = useJudge();
-  const client = usePublicClient();
-  const { door } = site();
-  const quote = useQuery({
-    queryKey: ["home-quote", judge?.asset],
-    enabled: !!door && !!judge && !!client,
-    staleTime: 60_000,
-    queryFn: () => quoteEth(client!, judge!.asset, judge!.price, judge!.poolFee, judge!.poolTickSpacing),
-  });
-  if (quote.data !== undefined) return <>about {amount(quote.data)} ETH</>;
-  return <>{judge ? `${amount(judge.price)} ${judge.symbol}` : "0.5 IMD"}</>;
 }
 
 function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
@@ -254,72 +213,106 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
   );
 }
 
-function HowTo() {
-  const [way, setWay] = useState<"ai" | "hand">("ai");
+const TABS: Array<[Tab, string]> = [
+  ["agent", "For your agent"],
+  ["contract", "In a contract"],
+  ["ask", "Ask here"],
+];
+
+/** Three ways in. Each is its own address, so a reload or a shared link opens the same one. */
+function Tabs({ tab }: { tab: Tab }) {
+  const row = useRef<HTMLDivElement>(null);
+  const pill = useRef<HTMLSpanElement>(null);
+  // The grey pill sits under the open tab and slides to the next one.
+  useLayoutEffect(() => {
+    const list = row.current;
+    const mark = pill.current;
+    if (!list || !mark) return;
+    const place = () => {
+      const open = list.querySelector<HTMLElement>('[aria-selected="true"]');
+      if (!open) return;
+      mark.style.width = `${open.offsetWidth}px`;
+      mark.style.transform = `translateX(${open.offsetLeft}px)`;
+    };
+    place();
+    const watch = new ResizeObserver(place);
+    list.querySelectorAll("[role=tab]").forEach((button) => watch.observe(button));
+    // it slides only once the font has landed, so the page never opens with it moving
+    let live = true;
+    void document.fonts.ready.then(() => requestAnimationFrame(() => live && mark.classList.add("is-placed")));
+    return () => {
+      live = false;
+      watch.disconnect();
+    };
+  }, [tab]);
+  const go = (to: Tab) => {
+    if (to === tab) return;
+    // the words typed in Ask here wait there for the reader to come back
+    if (tab === "ask") lastAsk = location.hash;
+    location.hash = to === "ask" ? lastAsk : to === "contract" ? "#/contract" : "#/";
+  };
+  // arrows move between the tabs; Enter or a click opens one
+  const move = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("[role=tab]")];
+    const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    const next = buttons[(at + (event.key === "ArrowRight" ? 1 : buttons.length - 1)) % buttons.length];
+    next?.focus();
+    event.preventDefault();
+  };
   return (
-    <section className="howto">
-      <div className="howto-head">
-        <h2>How to use it</h2>
-        <div className="seg" role="tablist" aria-label="How to use it">
-          {(
-            [
-              ["ai", "With your AI"],
-              ["hand", "By hand"],
-            ] as const
-          ).map(([key, words]) => (
-            <button key={key} role="tab" aria-selected={way === key} onClick={() => setWay(key)}>
-              {words}
-            </button>
-          ))}
+    <div ref={row} className="tabs" role="tablist" aria-label="Ways to use Judge" onKeyDown={move}>
+      <span ref={pill} className="tab-pill" aria-hidden="true" />
+      {TABS.map(([key, words]) => (
+        <button key={key} id={`tab-${key}`} role="tab" aria-selected={tab === key} aria-controls="tab-panel" tabIndex={tab === key ? 0 : -1} onClick={() => go(key)}>
+          {words}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** The whole agent path: the skill does the rest, testing first and nothing live without a yes. */
+function AgentSteps() {
+  return (
+    <div className="agent">
+      <p className="agent-line">Paste this into Claude Code, Cursor or any AI that writes code.</p>
+      <Prompt />
+    </div>
+  );
+}
+
+function ContractSteps() {
+  return (
+    <ol className="steps">
+      <Step n={1} title="Install it">
+        <p>
+          Run this in your project. It uses <a href="https://getfoundry.sh">Foundry</a>. Not on Foundry? <a href={`${REPOSITORY}#add-it`}>Copy the one file</a> instead.
+        </p>
+        <div className="code-box code-one">
+          <code>{INSTALL}</code>
+          <CopyButton text={INSTALL} label="Copy the install command" />
         </div>
-      </div>
-      {way === "ai" ? (
-        <ol className="steps" key="ai">
-          <Step n={1} title="Tell your AI what you want">
-            <p>Paste this into Claude Code, Cursor or any AI that writes code. Change the last line to whatever you want.</p>
-            <Prompt />
-          </Step>
-          <Step n={2} title="Your AI builds and tests it">
-            <p>Testing is free. Nothing goes live and no money moves until you say so.</p>
-          </Step>
-          <Step n={3} title="Put it live">
-            <p>
-              Tell your AI to put it live, and it'll show you how to use it. Each question costs <Price />. A vote can be wrong, so only put in what you can afford to lose.
-            </p>
-          </Step>
-        </ol>
-      ) : (
-        <ol className="steps" key="hand">
-          <Step n={1} title="Install it">
-            <p>
-              Run this in your project. It uses <a href="https://getfoundry.sh">Foundry</a>. Not on Foundry? <a href={`${REPOSITORY}#add-it`}>Copy the one file</a> instead.
-            </p>
-            <div className="code-box code-one">
-              <code>{INSTALL}</code>
-              <CopyButton text={INSTALL} label="Copy the install command" />
-            </div>
-          </Step>
-          <Step n={2} title="Add it to your contract">
-            <p>
-              Inherit <code>Judged</code>. Ask with <code>ask</code>, and say what happens on a yes in <code>onYes</code>. Swap in your own question and address.
-            </p>
-            <CodeBox lines={CONTRACT} />
-          </Step>
-          <Step n={3} title="Test it for free">
-            <p>
-              Run <code>forge test</code>. A stand-in answers, so it costs nothing and takes no time.
-            </p>
-            <CodeBox lines={TEST} />
-          </Step>
-        </ol>
-      )}
-    </section>
+      </Step>
+      <Step n={2} title="Add it to your contract">
+        <p>
+          Inherit <code>Judged</code>. Ask with <code>ask</code>, and say what happens on a yes in <code>onYes</code>. Swap in your own question and address.
+        </p>
+        <CodeBox lines={CONTRACT} />
+      </Step>
+      <Step n={3} title="Test it for free">
+        <p>
+          Run <code>forge test</code>. A stand-in answers, so it costs nothing and takes no time.
+        </p>
+        <CodeBox lines={TEST} />
+      </Step>
+    </ol>
   );
 }
 
 const verdictWord: Record<Verdict, string> = { Pending: "Voting", Yes: "Yes", No: "No", NoAnswer: "No answer" };
 
-export function CaseRows({ skip, quietWhenEmpty }: { skip?: number; quietWhenEmpty?: boolean }) {
+export function CaseRows({ skip, quietWhenEmpty, title }: { skip?: number; quietWhenEmpty?: boolean; title?: string }) {
   const { data: count, isError: countFailed, refetch: refetchCount } = useCaseCount();
   const rows = useCaseRows();
   const shown = rows.data?.filter((row) => row.id !== skip);
@@ -327,9 +320,9 @@ export function CaseRows({ skip, quietWhenEmpty }: { skip?: number; quietWhenEmp
   if (skip && shown?.length === 0) return null;
   if (quietWhenEmpty && count === 0) return null;
   return (
-    <section className="cases" aria-labelledby="cases-title">
+    <section className="section cases" aria-labelledby="cases-title">
       <h2 id="cases-title">
-        {skip ? "Other questions" : "Latest questions"}
+        {title ?? (skip ? "Other questions" : "Latest questions")}
         {testnet && <span className="aside">Test questions on {chainName}</span>}
       </h2>
       {(rows.isError || countFailed) && !rows.data ? (
@@ -368,49 +361,185 @@ export function CaseRows({ skip, quietWhenEmpty }: { skip?: number; quietWhenEmp
   );
 }
 
+/** What a developer checks before trusting it: the code, the contract, who controls it and what it rests on. */
 function Footer() {
+  const { explorer, judge } = site();
   return (
     <footer className="foot">
-      Judge has no owner and adds no fee, and nobody can change it. It runs on <a href="https://imd.fun">IMD</a>. Read the <a href={`${REPOSITORY}/blob/main/src/Judge.sol`}>164 lines</a> and the{" "}
-      <a href={`${REPOSITORY}#before-you-put-money-on-a-verdict`}>rules</a> before you put money on an answer.
+      <dl className="facts">
+        <div>
+          <dt>Open source</dt>
+          <dd>
+            <a href={REPOSITORY}>Code and tests on GitHub</a>, MIT license. The contract is <a href={`${REPOSITORY}/blob/main/src/Judge.sol`}>164 lines</a>.
+          </dd>
+        </div>
+        <div>
+          <dt>Contract</dt>
+          <dd>
+            <a href={`${explorer}/address/${judge}`}>{short(judge)}</a> on Ethereum, <a href={`https://repo.sourcify.dev/1/${judge}`}>source verified</a>.
+          </dd>
+        </div>
+        <div>
+          <dt>Owner</dt>
+          <dd>None. It takes no fee, and nobody can change it.</dd>
+        </div>
+        <div>
+          <dt>Answers</dt>
+          <dd>
+            AI agents on <a href="https://imd.fun">IMD</a> vote, one IMD key signs the result, and the contract checks the signature. A vote can be wrong, so read the{" "}
+            <a href={`${REPOSITORY}#what-it-depends-on`}>risks</a> before you put money on one.
+          </dd>
+        </div>
+      </dl>
     </footer>
   );
 }
 
-function Home({ ask, onOpened }: { ask: boolean; onOpened: (id: number) => void }) {
+/** The newest real answer, so the page shows what it says before it explains it. */
+function LatestAnswer({ id }: { id: number }) {
+  // id 0 is the count still loading: the card holds its size and asks for nothing
+  const chain = useCaseOnChain(id, id > 0);
+  const panel = useCasePanel(id, chain.data);
   const { data: judge } = useJudge();
+  const verdict = chain.data?.verdict;
+  const words = panel.data ?? null;
+  const votes = words?.votes ?? [];
+  const yes = votes.filter((vote) => vote.yes).length;
+  const record = words?.record;
+  const time = record?.attestedAt ? took(record.createdAt, record.attestedAt) : "";
+  const line =
+    verdict === "Pending"
+      ? votes.length
+        ? `${yes} yes, ${votes.length - yes} no so far`
+        : "The agents are reading it"
+      : verdict === "NoAnswer"
+        ? "Nothing was signed"
+        : verdict && votes.length
+          ? `${yes} to ${votes.length - yes}${time ? `, in ${time}` : ""}`
+          : "";
+  return (
+    <a className="latest" href={`#/case/${id}`}>
+      <span className="latest-rule">{words?.rule ?? " "}</span>
+      {/* the answer beside the votes that made it */}
+      <span className="latest-vote">
+        <b className={`v-${verdict ?? "Pending"}`}>{verdict ? headline[verdict] : " "}</b>
+        <Seats panelSize={judge?.panelSize ?? 100} votes={votes} live={verdict === "Pending"} fill />
+      </span>
+      <span className="latest-line">
+        <span>{line}</span>
+        <time>{chain.data?.askedAt ? timeAgo(chain.data.askedAt) : ""}</time>
+      </span>
+    </a>
+  );
+}
+
+/** What people use it for: each pays out on something the panel can check from a link. The number is
+ * the tile's colour, ordered so no two tiles of one colour touch, four across or two. */
+const USES: Array<[string, string, number]> = [
+  ["Prediction markets", "Pay out when the result is official.", 1],
+  ["Bounties", "Pay when the pull request merges.", 2],
+  ["Jobs", "Pay when the article is published.", 3],
+  ["Grants", "Pay as each milestone ships.", 4],
+  ["Shoutouts", "Pay when the post goes up on X.", 2],
+  ["Contests", "Pay each entry that meets the rules.", 3],
+  ["Goals", "Get your deposit back if you do it.", 4],
+  ["Dares", "Pay when the proof is posted.", 1],
+];
+
+/** One part of the page under its own heading, set off by a hairline. */
+function Section({ id, title, className, children }: { id: string; title: string; className?: string; children: React.ReactNode }) {
+  return (
+    <section className={className ? `section ${className}` : "section"} aria-labelledby={id}>
+      <h2 id={id}>{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+/** Where it lives, so a reader knows it's a real contract on a real chain. */
+function Chain() {
+  const { chainName, explorer, judge } = site();
+  return (
+    <p className="chain">
+      <svg width="16" height="16" viewBox="-3 0 16 16" aria-hidden="true">
+        <path d="M5 0 0 8.15 5 11.1 10 8.15zM5 12.05 0 9.1 5 16 10 9.1z" fill="currentColor" />
+      </svg>
+      <span>
+        Live on {chainName} at <a href={`${explorer}/address/${judge}`}>{short(judge)}</a>
+      </span>
+    </p>
+  );
+}
+
+/** What it's good for, right under the headline it explains. */
+function Uses() {
+  return (
+    <dl className="uses" aria-label="What it's good for">
+        {USES.map(([use, line, hue]) => (
+          <div key={use} data-hue={hue}>
+            <dt>{use}</dt>
+            <dd>{line}</dd>
+          </div>
+        ))}
+    </dl>
+  );
+}
+
+/** The top of the home page. The build also writes it into the HTML, so it shows before any script runs. */
+function Hero() {
+  const { data: judge } = useJudge();
+  const { data: count } = useCaseCount();
   const agents = judge ? `${judge.panelSize} ` : <span className="hold">100 </span>;
-  if (ask) {
-    return (
+  return (
+    <>
+      <h1>Get a yes or no on anything</h1>
+      <p className="lede">
+        Connect any smart contract action to the answer. A jury of {agents}AI agents, powered by <a href="https://imd.fun">IMD</a>, checks the proof and votes.
+      </p>
+      <Chain />
+      <Uses />
+    </>
+  );
+}
+
+/** What the HTML carries before the script runs: the header and the top of the home page. */
+export function Shell() {
+  return (
+    <div className="wrap" data-shell="">
+      <Header />
       <main>
-        <h1>Ask AI from this page</h1>
-        <p className="lede">Ask a yes or no question and attach proof. {agents}AI agents check it and vote. You get the answer in about 5 minutes.</p>
-        <div className="frame">
-          <AskForm onOpened={onOpened} />
-          <a
-            className="frame-row frame-try"
-            href="#/"
-            onClick={() => {
-              lastAsk = location.hash;
-            }}
-          >
-            <span>Add Judge to your contract</span>
-            <Chevron />
-          </a>
-        </div>
-        <CaseRows />
+        <Hero />
       </main>
-    );
-  }
+    </div>
+  );
+}
+
+function Home({ tab, onOpened }: { tab: Tab; onOpened: (id: number) => void }) {
+  const { data: count } = useCaseCount();
   return (
     <main>
-      <h1>Ask AI from your contract</h1>
-      <p className="lede">Your smart contract asks a yes or no question and attaches proof. {agents}AI agents check it and vote. About 5 minutes later, your contract gets the answer.</p>
-      <HowTo />
-      <p className="try-line">
-        Just want to try it? <a href={lastAsk}>Ask a question from this page</a>.
-      </p>
-      <CaseRows quietWhenEmpty />
+      <Hero />
+      <Section id="how-title" title="How to use it">
+        <Tabs tab={tab} />
+        <div className="tab-panel" id="tab-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} key={tab}>
+          {tab === "agent" ? (
+            <AgentSteps />
+          ) : tab === "contract" ? (
+            <ContractSteps />
+          ) : (
+            <div className="frame">
+              <AskForm onOpened={onOpened} />
+            </div>
+          )}
+        </div>
+      </Section>
+      {count !== 0 && (
+        <Section id="latest-title" title="Latest answer">
+          <LatestAnswer id={count ?? 0} />
+        </Section>
+      )}
+      {/* the list asks to be filled only where a question can be asked */}
+      <CaseRows skip={count || undefined} title="Earlier questions" quietWhenEmpty={tab !== "ask"} />
     </main>
   );
 }
@@ -427,7 +556,7 @@ export function App() {
   return (
     <div className="wrap">
       <Header />
-      {route.page === "case" ? <CasePage key={route.id} id={route.id} /> : <Home ask={route.ask} onOpened={onOpened} />}
+      {route.page === "case" ? <CasePage key={route.id} id={route.id} /> : <Home tab={route.tab} onOpened={onOpened} />}
       <Footer />
     </div>
   );

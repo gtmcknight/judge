@@ -22,8 +22,18 @@ export async function quoteEth(client: NonNullable<ReturnType<typeof getPublicCl
 
 /** Room above the node's estimate: Sepolia prices new storage far above what wallets assume. */
 const withRoom = (gas: bigint) => (gas * 3n) / 2n;
-/** Room above the quote, so a small move in the pool can't fail the ask. What's unused comes back. */
-const withSlip = (wei: bigint) => (wei * 103n) / 100n;
+/**
+ * What paying in ETH sends: the quote with room for a small move in the pool, rounded up to the two
+ * digits the page shows, so the button, the wallet and the transaction all say the same number.
+ * The door swaps for the exact price and sends back what's unused.
+ */
+export function ethToSend(quote: bigint): bigint {
+  const roomy = (quote * 103n) / 100n;
+  const digits = roomy.toString().length;
+  if (digits <= 2) return roomy;
+  const unit = 10n ** BigInt(digits - 2);
+  return ((roomy + unit - 1n) / unit) * unit;
+}
 
 class Plain extends Error {}
 
@@ -88,9 +98,9 @@ export function useAsk(onOpened: (id: number) => void) {
           const quoted = await quoteEth(client, input.asset, input.price, input.poolFee, input.poolTickSpacing).catch(() => {
             throw new Plain("The pool can't price this right now. Nothing was sent. Pay in IMD, or try later.");
           });
-          const value = withSlip(quoted);
+          const value = ethToSend(quoted);
           const held = await client.getBalance({ address });
-          if (held < value) throw new Plain(`You need about ${amount(value)} ETH plus gas. This wallet has ${amount(held)}.`);
+          if (held < value) throw new Plain(`You need ${amount(value)} ETH plus gas. This wallet has ${amount(held)}.`);
           call = { address: door.address, abi: door.abi, functionName: "ask", args: [input.rule, input.proof], account: address, value } as const;
         } else {
           const held = await readContract(config, { address: input.asset, abi: erc20Abi, functionName: "balanceOf", args: [address] });

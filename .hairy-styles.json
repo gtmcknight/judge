@@ -1,0 +1,46 @@
+{
+  "keep": [
+    {
+      "unit": "spacing",
+      "value": 17,
+      "why": "code hanging indent: 2ch of the mono font, so wrapped code lines up under its own indent"
+    },
+    {
+      "unit": "spacing",
+      "value": 50.5,
+      "why": "code hanging indent: 6ch"
+    },
+    {
+      "unit": "spacing",
+      "value": 84,
+      "why": "code hanging indent: 10ch"
+    },
+    {
+      "unit": "sizes",
+      "value": 70,
+      "why": "a question's verdict on a phone: sized to the screen so 'No answer' fits on one line"
+    },
+    {
+      "unit": "sizes",
+      "value": 120,
+      "why": "a question's verdict on a laptop"
+    }
+  ],
+  "scale": {
+    "sizes": [
+      14,
+      16,
+      24,
+      40,
+      54
+    ],
+    "weights": [
+      400,
+      500,
+      700
+    ],
+    "icons": [
+      16
+    ]
+  }
+}

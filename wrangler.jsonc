@@ -1,8 +1,12 @@
 {
-  // The site, as an assets-only Worker. It has no address of its own: the taylor-fyi router serves it at
-  // taylor.fyi/judge through a JUDGE service binding and strips the prefix, which is why every URL here is relative.
+  // The site and its server side. It has no address of its own: the taylor-fyi router serves it at
+  // taylor.fyi/judge through a JUDGE service binding and strips the prefix, which is why every URL in
+  // the site is relative. Built files are served first; the Worker answers /case/<n> and its preview.
   "name": "judge",
+  "main": "site/worker/index.ts",
   "compatibility_date": "2026-09-01",
   "workers_dev": false,
-  "assets": { "directory": "./dist" }
+  "assets": { "directory": "./dist", "binding": "ASSETS" },
+  "vars": { "PUBLIC_URL": "https://taylor.fyi/judge" },
+  "rules": [{ "type": "Data", "globs": ["**/*.woff"], "fallthrough": true }]
 }

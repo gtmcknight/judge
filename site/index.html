@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Judge: ask AI from your contract</title>
-    <meta name="description" content="Your contract asks a yes or no question and attaches proof. AI agents vote, and it acts on the signed answer about 5 minutes later." />
-    <meta property="og:title" content="Judge: ask AI from your contract" />
-    <meta property="og:description" content="Your contract asks a yes or no question and attaches proof. AI agents vote, and it acts on the signed answer about 5 minutes later." />
+    <title>Judge: get a yes or no on anything</title>
+    <meta name="description" content="Connect any smart contract action to the answer. A jury of 100 AI agents, powered by IMD, checks the proof and votes." />
+    <meta property="og:title" content="Judge: get a yes or no on anything" />
+    <meta property="og:description" content="Connect any smart contract action to the answer. A jury of 100 AI agents, powered by IMD, checks the proof and votes." />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://taylor.fyi/judge/og.png" />
     <meta name="twitter:card" content="summary_large_image" />
@@ -14,18 +14,15 @@
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <script>
       (function () {
+        // the page is light; ?theme=dark still draws the night colours, for checking them
         var theme = "light";
         try {
-          var asked = new URLSearchParams(location.search).get("theme");
-          if (asked === "light" || asked === "dark") {
-            theme = asked;
-            localStorage.setItem("theme", asked);
-          } else if (localStorage.getItem("theme") === "dark") {
-            theme = "dark";
-          }
+          if (new URLSearchParams(location.search).get("theme") === "dark") theme = "dark";
         } catch (e) {}
         document.documentElement.dataset.theme = theme;
         document.querySelector('meta[name="theme-color"]').content = theme === "dark" ? "#000000" : "#ffffff";
+        // the HTML carries the home page's top; a question's page hides it until the script draws its own
+        if (/^#\/case\//.test(location.hash) || /\/case\/\d+\/?$/.test(location.pathname)) document.documentElement.dataset.case = "";
       })();
     </script>
   </head>

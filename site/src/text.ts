@@ -55,15 +55,6 @@ export function questionHashOf(record: { question: string; chainId: number; answ
   return keccak256(stringToHex(document));
 }
 
-/** The clipboard can refuse, or not exist off https, so a copy says whether it worked. */
-export async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export const short = (address: string) => `${address.slice(0, 6)}…${address.slice(-4)}`;
 
