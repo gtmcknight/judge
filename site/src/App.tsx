@@ -1,21 +1,27 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { useQuery } from "@tanstack/react-query";
+import { useConfig, useConnection, usePublicClient } from "wagmi";
+import { ethToSend, quoteEth } from "./ask";
 import { REPOSITORY, site } from "./deployment";
 import { useCaseCount, useCaseOnChain, useCasePanel, useCaseRows, useJudge, type Verdict } from "./cases";
 import { AskForm } from "./AskPanel";
 import { CasePage, Seats } from "./CasePage";
 import { headline } from "./imd";
-import { CONTRACT, IDEAS, INSTALL, TEST, asFile } from "./snippet";
-import { short, timeAgo, took } from "./text";
+import { INSTALL, INSTALL_WITH_OZ, asFile } from "./snippet";
+import { USES } from "./uses";
+import { amount, short, timeAgo, took } from "./text";
 import { copyText } from "./clipboard";
+import { useWalletSheet } from "./wallet";
+import { payWords, priceOfBuild } from "./imd-api";
 
-type Tab = "agent" | "contract" | "ask";
+type Tab = "launch" | "agent" | "contract" | "ask";
 type Route = { page: "home"; tab: Tab } | { page: "case"; id: number };
 
 function readRoute(): Route {
   const match = /^#\/case\/(\d+)$/.exec(location.hash);
   if (match?.[1]) return { page: "case", id: Number(match[1]) };
-  const tab: Tab = location.hash.startsWith("#/ask") ? "ask" : location.hash.startsWith("#/contract") ? "contract" : "agent";
+  const tab: Tab = location.hash.startsWith("#/ask") ? "ask" : location.hash.startsWith("#/contract") ? "contract" : location.hash.startsWith("#/agent") ? "agent" : "launch";
   return { page: "home", tab };
 }
 
@@ -69,7 +75,7 @@ function Header() {
   );
 }
 
-const KEYWORD = /^(import|from|contract|is|function|external|internal|public|payable|override|constant|address|string|calldata|uint256|new)$/;
+const KEYWORD = /^(import|from|contract|is|function|external|internal|public|payable|override|constant|immutable|address|string|calldata|memory|uint256|bool|mapping|new|if|return)$/;
 
 /** A code line that wraps on a phone hangs under its own indent, and never scrolls sideways. */
 function Line({ text }: { text: string }) {
@@ -103,7 +109,7 @@ function Line({ text }: { text: string }) {
   );
 }
 
-function Code({ lines }: { lines: string[] }) {
+function Code({ lines }: { lines: readonly string[] }) {
   return (
     <pre className="step-code">
       <code>
@@ -115,39 +121,51 @@ function Code({ lines }: { lines: string[] }) {
   );
 }
 
-export function CopyButton({ text, label, next, onCopied }: { text: string; label: string; next?: boolean; onCopied?: () => void }) {
+export function CopyButton({ text, label, next, wide, onCopied }: { text: string; label: string; next?: boolean; wide?: boolean; onCopied?: () => void }) {
   const [copied, setCopied] = useState<"" | "Copied" | "Couldn't copy">("");
   useEffect(() => {
     if (!copied) return;
     const timer = setTimeout(() => setCopied(""), 1600);
     return () => clearTimeout(timer);
   }, [copied]);
+  const copy = () => {
+    void copyText(text).then((ok) => {
+      setCopied(ok ? "Copied" : "Couldn't copy");
+      if (ok) onCopied?.();
+    });
+  };
+  // the tab's one action, as wide as the box, like Pay on Ask here
+  if (wide) {
+    return (
+      <button className="pill" aria-label={label} onClick={copy}>
+        {copied || "Copy"}
+      </button>
+    );
+  }
   return (
     <button
       className="copy"
       aria-label={label}
       data-next={!!next && !copied}
       data-done={!!copied}
-      onClick={() => {
-        void copyText(text).then((ok) => {
-          setCopied(ok ? "Copied" : "Couldn't copy");
-          if (ok) onCopied?.();
-        });
-      }}
+      onClick={copy}
     >
       <span>{copied || "Copy"}</span>
     </button>
   );
 }
 
-/** The box to paste into an AI: the fixed line that points it here, then what you want in your own words. */
-/** The line typed in the paste box, kept while the reader looks at another tab. */
-let wishDraft: string = IDEAS[0]![1];
+/** The line typed in the words box for a use, kept while the reader looks at another tab. */
+let wishDraft: { use: number; text: string } | null = null;
 
-function Prompt() {
-  const [wish, setShown] = useState(wishDraft);
+/**
+ * The words box: the fixed line that points at the skill, then what you want in your own words. The
+ * same words go to your AI (Copy) or to IMD (Pay), so both tabs share what was typed.
+ */
+function Prompt({ use, then }: { use: number; then: "copy" | "launch" }) {
+  const [wish, setShown] = useState(() => (wishDraft?.use === use ? wishDraft.text : USES[use]!.prompt));
   const setWish = (text: string) => {
-    wishDraft = text;
+    wishDraft = { use, text };
     setShown(text);
   };
   const box = useRef<HTMLTextAreaElement>(null);
@@ -156,8 +174,7 @@ function Prompt() {
     const area = box.current;
     if (!area) return;
     area.style.height = "auto";
-    // the underline is a border, which scrollHeight leaves out
-    area.style.height = `${area.scrollHeight + area.offsetHeight - area.clientHeight}px`;
+    area.style.height = `${area.scrollHeight}px`;
   });
   return (
     <>
@@ -166,33 +183,127 @@ function Prompt() {
           Read and follow <a href={skill}>{skill.replace(/^https?:\/\//, "")}</a>
         </p>
         <textarea ref={box} rows={1} aria-label="What you want your contract to do" spellCheck={false} value={wish} onChange={(event) => setWish(event.target.value)} />
-        <div className="prompt-end">
-          <p className="ideas">
-            Try{" "}
-            {IDEAS.map(([name, text], i) => (
-              <span key={name}>
-                {i > 0 && " · "}
-                <button
-                  className="link"
-                  onClick={() => {
-                    setWish(text);
-                    // on a phone the keyboard would cover Copy
-                    if (matchMedia("(pointer: fine)").matches) box.current?.focus();
-                  }}
-                >
-                  {name}
-                </button>
-              </span>
-            ))}
-          </p>
-          <CopyButton text={`Read and follow ${skill}\n\n${wish}`} label="Copy this for your AI" next />
-        </div>
       </div>
+      {then === "copy" ? (
+        <>
+          <div className="prompt-copy">
+            <CopyButton text={`Read and follow ${skill}\n\n${wish}`} label="Copy this for your AI" wide />
+          </div>
+          <p className="agent-line">Paste this into Claude Code, Cursor or any AI that writes code.</p>
+        </>
+      ) : (
+        <ImdBuild wish={wish} />
+      )}
     </>
   );
 }
 
-function CodeBox({ lines }: { lines: string[] }) {
+/** Launch it: the same words, sent from this page to IMD's swarm as a paid build-and-launch job. */
+function ImdBuild({ wish }: { wish: string }) {
+  const config = useConfig();
+  const { address, isConnected } = useConnection();
+  const { open, isOpen } = useWalletSheet();
+  const [stage, setStage] = useState<string | null>(null);
+  const [error, setError] = useState<{ text: string; short: boolean } | null>(null);
+  const [built, setBuilt] = useState<{ jobUrl: string | null } | null>(null);
+  const said = useRef<HTMLParagraphElement>(null);
+
+  // IMD from a wallet that holds it, else the ETH that buys it; the last price stays up while the next loads
+  const price = useQuery({
+    queryKey: ["launch-price", address ?? null],
+    queryFn: () => priceOfBuild(config, address),
+    placeholderData: (last) => last,
+    refetchInterval: 60_000,
+  });
+  const words = price.data ? payWords(price.data) : "Pay 0.5 IMD and launch";
+
+  // a failure or the result can land below the fold, so it scrolls up into view
+  useEffect(() => {
+    if (error || built) said.current?.scrollIntoView({ block: "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }, [error, built]);
+
+  // Pay carries on after connecting, unless the sheet closed without a wallet or the wallet changes what Pay asks for
+  const [afterConnect, setAfterConnect] = useState<string | null>(null);
+  const go = async () => {
+    if (stage) return;
+    setError(null);
+    if (!wish.trim()) return setError({ text: "Say what to build in the box above first.", short: false });
+    if (!isConnected) {
+      setAfterConnect(words);
+      return open();
+    }
+    setStage("Starting…");
+    try {
+      const job = await import("./imd-job");
+      try {
+        setBuilt(await job.buyBuild(config, wish, setStage, price.data ?? { pays: "imd", amount: HALF_IMD, imd: HALF_IMD }));
+      } catch (e) {
+        setError({ text: job.explainBuild(e), short: e instanceof job.ShortOfImd });
+      }
+    } catch {
+      setError({ text: "This page couldn't load the payment step. Nothing was paid. Reload and try again.", short: false });
+    } finally {
+      setStage(null);
+      // a swap, or a price that moved, changes what Pay asks for next
+      void price.refetch();
+    }
+  };
+  const carryOn = useRef(go);
+  carryOn.current = go;
+  useEffect(() => {
+    if (afterConnect === null) return;
+    if (!isConnected) {
+      if (!isOpen) setAfterConnect(null);
+      return;
+    }
+    if (price.isPlaceholderData || price.isFetching || !price.data) return;
+    setAfterConnect(null);
+    if (payWords(price.data) === afterConnect) void carryOn.current();
+  }, [afterConnect, isConnected, isOpen, price.data, price.isPlaceholderData, price.isFetching]);
+
+  if (built) {
+    return (
+      <>
+        {built.jobUrl && (
+          <div className="prompt-copy">
+            <a className="pill" href={built.jobUrl}>
+              Follow the build
+            </a>
+          </div>
+        )}
+        <p className="agent-line" ref={said} role="status">
+          {built.jobUrl ? "Sent. IMD's swarm is building it." : "Sent. The job shows on IMD's explorer under your wallet in a few minutes."}
+        </p>
+      </>
+    );
+  }
+  return (
+    <>
+      <div className="prompt-copy">
+        <button className="pill" onClick={() => void go()} disabled={!!stage} aria-busy={!!stage}>
+          {stage ?? words}
+        </button>
+      </div>
+      {error ? (
+        <p className="agent-line ask-error" ref={said} role="alert">
+          {error.text}
+          {error.short && (
+            <>
+              {" "}
+              <a href="https://imd.fun/buy/">Get IMD</a>
+            </>
+          )}
+        </p>
+      ) : (
+        <p className="agent-line">IMD builds a site and launches the contract for your idea. Another agent audits the contract first.</p>
+      )}
+    </>
+  );
+}
+
+const HALF_IMD = 5n * 10n ** 17n;
+
+function CodeBox({ lines }: { lines: readonly string[] }) {
   return (
     <div className="code-box">
       <CopyButton text={asFile(lines)} label="Copy this code" />
@@ -214,12 +325,13 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 }
 
 const TABS: Array<[Tab, string]> = [
+  ["launch", "Launch it"],
   ["agent", "For your agent"],
   ["contract", "In a contract"],
   ["ask", "Ask here"],
 ];
 
-/** Three ways in. Each is its own address, so a reload or a shared link opens the same one. */
+/** Four ways in. Each is its own address, so a reload or a shared link opens the same one. */
 function Tabs({ tab }: { tab: Tab }) {
   const row = useRef<HTMLDivElement>(null);
   const pill = useRef<HTMLSpanElement>(null);
@@ -232,7 +344,8 @@ function Tabs({ tab }: { tab: Tab }) {
       const open = list.querySelector<HTMLElement>('[aria-selected="true"]');
       if (!open) return;
       mark.style.width = `${open.offsetWidth}px`;
-      mark.style.transform = `translateX(${open.offsetLeft}px)`;
+      mark.style.height = `${open.offsetHeight}px`;
+      mark.style.transform = `translate(${open.offsetLeft}px, ${open.offsetTop}px)`;
     };
     place();
     const watch = new ResizeObserver(place);
@@ -249,7 +362,7 @@ function Tabs({ tab }: { tab: Tab }) {
     if (to === tab) return;
     // the words typed in Ask here wait there for the reader to come back
     if (tab === "ask") lastAsk = location.hash;
-    location.hash = to === "ask" ? lastAsk : to === "contract" ? "#/contract" : "#/";
+    location.hash = to === "ask" ? lastAsk : to === "contract" ? "#/contract" : to === "agent" ? "#/agent" : "#/";
   };
   // arrows move between the tabs; Enter or a click opens one
   const move = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -273,16 +386,26 @@ function Tabs({ tab }: { tab: Tab }) {
 }
 
 /** The whole agent path: the skill does the rest, testing first and nothing live without a yes. */
-function AgentSteps() {
+function AgentSteps({ use }: { use: number }) {
   return (
     <div className="agent">
-      <p className="agent-line">Paste this into Claude Code, Cursor or any AI that writes code.</p>
-      <Prompt />
+      <Prompt key={use} use={use} then="copy" />
     </div>
   );
 }
 
-function ContractSteps() {
+/** The same box, and IMD builds, audits and launches it instead of your AI. */
+function LaunchSteps({ use }: { use: number }) {
+  return (
+    <div className="agent launch">
+      <Prompt key={use} use={use} then="launch" />
+    </div>
+  );
+}
+
+function ContractSteps({ use }: { use: number }) {
+  const { code } = USES[use]!;
+  const install = code.needsOpenZeppelin ? INSTALL_WITH_OZ : INSTALL;
   return (
     <ol className="steps">
       <Step n={1} title="Install it">
@@ -290,21 +413,21 @@ function ContractSteps() {
           Run this in your project. It uses <a href="https://getfoundry.sh">Foundry</a>. Not on Foundry? <a href={`${REPOSITORY}#add-it`}>Copy the one file</a> instead.
         </p>
         <div className="code-box code-one">
-          <code>{INSTALL}</code>
-          <CopyButton text={INSTALL} label="Copy the install command" />
+          <code>{install}</code>
+          <CopyButton text={install} label="Copy the install command" />
         </div>
       </Step>
       <Step n={2} title="Add it to your contract">
         <p>
           Inherit <code>Judged</code>. Ask with <code>ask</code>, and say what happens on a yes in <code>onYes</code>. Swap in your own question and address.
         </p>
-        <CodeBox lines={CONTRACT} />
+        <CodeBox lines={code.contract} />
       </Step>
       <Step n={3} title="Test it for free">
         <p>
           Run <code>forge test</code>. A stand-in answers, so it costs nothing and takes no time.
         </p>
-        <CodeBox lines={TEST} />
+        <CodeBox lines={code.test} />
       </Step>
     </ol>
   );
@@ -433,18 +556,6 @@ function LatestAnswer({ id }: { id: number }) {
   );
 }
 
-/** What people use it for: each pays out on something the panel can check from a link. The number is
- * the tile's colour, ordered so no two tiles of one colour touch, four across or two. */
-const USES: Array<[string, string, number]> = [
-  ["Prediction markets", "Pay out when the result is official.", 1],
-  ["Bounties", "Pay when the pull request merges.", 2],
-  ["Jobs", "Pay when the article is published.", 3],
-  ["Grants", "Pay as each milestone ships.", 4],
-  ["Shoutouts", "Pay when the post goes up on X.", 2],
-  ["Contests", "Pay each entry that meets the rules.", 3],
-  ["Goals", "Get your deposit back if you do it.", 4],
-  ["Dares", "Pay when the proof is posted.", 1],
-];
 
 /** One part of the page under its own heading, set off by a hairline. */
 function Section({ id, title, className, children }: { id: string; title: string; className?: string; children: React.ReactNode }) {
@@ -471,21 +582,37 @@ function Chain() {
   );
 }
 
-/** What it's good for, right under the headline it explains. */
-function Uses() {
+/** What it's good for, as the first pick: a tile picks the use the four ways below it show. */
+function Uses({ picked, onPick }: { picked: number; onPick: (use: number) => void }) {
   return (
-    <dl className="uses" aria-label="What it's good for">
-        {USES.map(([use, line, hue]) => (
-          <div key={use} data-hue={hue}>
-            <dt>{use}</dt>
-            <dd>{line}</dd>
-          </div>
-        ))}
-    </dl>
+    <div className="uses" role="group" aria-label="What it's good for">
+      {USES.map((use, i) => (
+        <button key={use.name} data-hue={use.hue} aria-pressed={i === picked} onClick={() => onPick(i)}>
+          <span className="use-name">{use.name}</span>
+          <span className="use-line">{use.line}</span>
+        </button>
+      ))}
+    </div>
   );
 }
 
 /** The top of the home page. The build also writes it into the HTML, so it shows before any script runs. */
+/** What one question costs: the same number Ask here's Pay button shows, from today's pool price. */
+function QuestionPrice() {
+  const { data: judge } = useJudge();
+  const client = usePublicClient();
+  const { door } = site();
+  const quote = useQuery({
+    queryKey: ["home-quote", judge?.asset],
+    enabled: !!door && !!judge && !!client,
+    staleTime: 60_000,
+    queryFn: () => quoteEth(client!, judge!.asset, judge!.price, judge!.poolFee, judge!.poolTickSpacing),
+  });
+  if (quote.data !== undefined) return <>{amount(ethToSend(quote.data))} ETH</>;
+  // until the pool answers, the price as the contract sets it, which is exact
+  return <>{judge ? `${amount(judge.price)} ${judge.symbol}` : "0.5 IMD"}</>;
+}
+
 function Hero() {
   const { data: judge } = useJudge();
   const { data: count } = useCaseCount();
@@ -494,10 +621,13 @@ function Hero() {
     <>
       <h1>Get a yes or no on anything</h1>
       <p className="lede">
-        Connect any smart contract action to the answer. A jury of {agents}AI agents, powered by <a href="https://imd.fun">IMD</a>, checks the proof and votes.
+        Connect any smart contract action to the answer. A jury of {agents}AI agents, powered by <a href="https://imd.fun">IMD</a>, checks the proof and votes, for{" "}
+        <span className="price">
+          <QuestionPrice />
+        </span>{" "}
+        a question.
       </p>
       <Chain />
-      <Uses />
     </>
   );
 }
@@ -514,21 +644,35 @@ export function Shell() {
   );
 }
 
+/** The use the tiles picked, kept while the reader opens a question and comes back. */
+let pickedUse = 0;
+
 function Home({ tab, onOpened }: { tab: Tab; onOpened: (id: number) => void }) {
   const { data: count } = useCaseCount();
+  const [picked, setPicked] = useState(pickedUse);
+  const pick = (use: number) => {
+    pickedUse = use;
+    setPicked(use);
+  };
   return (
     <main>
       <Hero />
       <Section id="how-title" title="How to use it">
+        {/* two picks in order: what to make, then how */}
+        <h3 className="pick">Pick what you want</h3>
+        <Uses picked={picked} onPick={pick} />
+        <h3 className="pick">Then pick how</h3>
         <Tabs tab={tab} />
         <div className="tab-panel" id="tab-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} key={tab}>
-          {tab === "agent" ? (
-            <AgentSteps />
+          {tab === "launch" ? (
+            <LaunchSteps use={picked} />
+          ) : tab === "agent" ? (
+            <AgentSteps use={picked} />
           ) : tab === "contract" ? (
-            <ContractSteps />
+            <ContractSteps use={picked} />
           ) : (
             <div className="frame">
-              <AskForm onOpened={onOpened} />
+              <AskForm onOpened={onOpened} example={USES[picked]!.ask} />
             </div>
           )}
         </div>

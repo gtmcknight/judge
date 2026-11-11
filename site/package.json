@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 3700 --strictPort",
-    "build": "tsc --noEmit && tsc --noEmit -p worker && vite build && vite build --ssr src/shell.tsx --outDir .ssr --emptyOutDir && node scripts/prerender.mjs && rm -rf .ssr",
+    "build": "node scripts/examples.mjs && tsc --noEmit && tsc --noEmit -p worker && vite build && vite build --ssr src/shell.tsx --outDir .ssr --emptyOutDir && node scripts/prerender.mjs && rm -rf .ssr",
     "preview": "vite preview --port 3701 --strictPort",
     "typecheck": "tsc --noEmit && tsc --noEmit -p worker"
   },
@@ -14,6 +14,8 @@
     "@fontsource-variable/inter": "5.3.0",
     "@fontsource/ibm-plex-mono": "5.3.0",
     "@tanstack/react-query": "5.105.3",
+    "@x402/core": "2.30.0",
+    "@x402/evm": "2.30.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "viem": "2.57.16",

@@ -10,7 +10,7 @@ export type Deployment = {
     rpcUrls: string[];
     explorer: string;
     nativeCurrency: { name: string; symbol: string; decimals: number };
-    uniswapV4: { quoter: Address };
+    uniswapV4: { quoter: Address; universalRouter: Address };
   };
 };
 
@@ -21,6 +21,8 @@ export type Site = {
   explorer: string;
   rpcUrls: string[];
   quoter: Address;
+  /** Uniswap's universal router, where the page buys IMD with ETH. */
+  router: Address;
   judge: Address;
   abi: Abi;
   /** The ETH door, where this chain has one. */
@@ -60,6 +62,7 @@ export function siteFrom(deployment: Deployment, abis: Record<string, Abi>): Sit
     explorer: network.explorer,
     rpcUrls: network.rpcUrls,
     quoter: network.uniswapV4.quoter,
+    router: network.uniswapV4.universalRouter,
     judge: judge.address,
     abi: abis[judge.abiPath]!,
     door: door ? { address: door.address, abi: abis[door.abiPath]! } : null,

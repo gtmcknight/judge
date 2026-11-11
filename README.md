@@ -66,6 +66,8 @@ That's the whole contract. Not on Foundry? Copy [`src/Judged.sol`](src/Judged.so
 
 One `ask` per call, and one per sender and value in a block. A second one reverts, since in a loop or a payable multicall it would pay from your contract's own money. `Judged` also won't deploy on a chain with no `Judge`.
 
+There's one example per use on the site, each with its test: a prediction market, a bounty, a job, a grant, a shoutout, a contest, a goal and a dare, in [`src/examples`](src/examples) and [`test/examples`](test/examples). Each pays only on a yes, and all but the short dare give the money a way out with a deadline.
+
 ## Test it for free
 
 Run `forge test`. A stand-in answers, so it costs nothing and takes no time.
@@ -160,17 +162,15 @@ No contract needed. IMD sells the same panel over HTTP, so a web app can ask a q
 
    ```json
    {
-     "v": 1,
      "question": "<the question from step 1>",
      "chainId": 1,
-     "window": { "hours": 1 },
      "answerType": "bool",
      "evidence": "panel",
-     "panelSize": 100,
-     "quorum": 51,
-     "validForSeconds": 3600
+     "panelSize": 100
    }
    ```
+
+   IMD sets the rest: a 24-hour window and the quorum, 70 of 100 at the time of writing. `POST /requests/check` with `{"action": "oracle.request", "input": …}` shows what a quote would say, for free.
 
 3. Once the order is admitted, its `admission` names the request. Read `https://api.imd.fun/oracle/requests/<id>`: `attested` with every agent's vote, or `disagreed` when no answer reached the quorum, which is no answer. The signed answer is at `/oracle/requests/<id>/attestation`, signed by `0x5598aa9146215bc13eb26f2c692ad1461fd32982`, the same key `Judge` checks.
 

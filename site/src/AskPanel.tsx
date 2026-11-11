@@ -20,7 +20,7 @@ type Field = "rule" | "proof";
 const draftOf = (field: Field) => new URLSearchParams(location.hash.split("?")[1] ?? "").get(field) ?? "";
 
 /** The one action on the page: the two boxes and the way to pay. */
-export function AskForm({ onOpened }: { onOpened: (id: number) => void }) {
+export function AskForm({ onOpened, example }: { onOpened: (id: number) => void; example: { rule: string; proof: string } }) {
   const [rule, setRule] = useState(() => draftOf("rule"));
   const [proof, setProof] = useState(() => draftOf("proof"));
   const [picked, setPicked] = useState<Pay | null>(null);
@@ -169,14 +169,14 @@ export function AskForm({ onOpened }: { onOpened: (id: number) => void }) {
           Your question
           {shown.rule && <em>{shown.rule}</em>}
         </span>
-        <textarea ref={ruleBox} rows={1} value={rule} placeholder="Did alice smash two eggs on their head?" aria-invalid={!!shown.rule} onChange={(e) => setRule(e.target.value)} onKeyDown={onKey} />
+        <textarea ref={ruleBox} rows={1} value={rule} placeholder={example.rule} aria-invalid={!!shown.rule} onChange={(e) => setRule(e.target.value)} onKeyDown={onKey} />
       </label>
       <label className="box">
         <span className="box-head">
           Your proof
           {shown.proof && <em>{shown.proof}</em>}
         </span>
-        <textarea ref={proofBox} rows={1} value={proof} placeholder="A link, or a few words" aria-invalid={!!shown.proof} onChange={(e) => setProof(e.target.value)} onKeyDown={onKey} />
+        <textarea ref={proofBox} rows={1} value={proof} placeholder={example.proof} aria-invalid={!!shown.proof} onChange={(e) => setProof(e.target.value)} onKeyDown={onKey} />
       </label>
       <div className="ask-row">
         <span>

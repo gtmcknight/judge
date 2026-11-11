@@ -146,9 +146,48 @@ async function page(request: Request, env: Env, id: number, c: Case | null): Pro
   return response;
 }
 
+/**
+ * The page's own way to IMD's paid API. IMD answers servers but refuses other sites' pages, so the
+ * "Have IMD build it" button's calls pass through here: only these five routes, only the headers the
+ * flow needs, and never a cookie or the page's address. Nothing is kept.
+ */
+const IMD_API = "https://api.imd.fun";
+const RELAYED: Array<[string, RegExp]> = [
+  ["GET", /^\/imd\/requests\/capabilities$/],
+  ["POST", /^\/imd\/requests\/check$/],
+  ["POST", /^\/imd\/requests\/quote$/],
+  ["POST", /^\/imd\/requests\/[0-9a-f-]{36}\/submit$/],
+  ["GET", /^\/imd\/requests\/[0-9a-f-]{36}$/],
+];
+
+async function relay(request: Request, path: string): Promise<Response> {
+  if (!RELAYED.some(([method, route]) => method === request.method && route.test(path))) return new Response(null, { status: 404 });
+  const body = request.method === "POST" ? await request.arrayBuffer() : undefined;
+  if (body && body.byteLength > 64 * 1024) return new Response(JSON.stringify({ error: "request_too_large" }), { status: 413 });
+  const headers = new Headers();
+  for (const name of ["authorization", "content-type", "payment-signature"]) {
+    const value = request.headers.get(name);
+    if (value) headers.set(name, value);
+  }
+  let upstream: Response;
+  try {
+    upstream = await fetch(IMD_API + path.slice("/imd".length), { method: request.method, headers, body });
+  } catch {
+    // IMD may or may not have it; the page asks the order's status before saying anything was or wasn't paid
+    return new Response(JSON.stringify({ error: "imd_unreachable" }), { status: 502, headers: { "content-type": "application/json", "cache-control": "no-store" } });
+  }
+  const out = new Headers({ "content-type": upstream.headers.get("content-type") ?? "application/json", "cache-control": "no-store" });
+  for (const name of ["payment-required", "payment-response", "retry-after"]) {
+    const value = upstream.headers.get(name);
+    if (value) out.set(name, value);
+  }
+  return new Response(upstream.body, { status: upstream.status, headers: out });
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/imd/")) return relay(request, url.pathname);
     const slashed = /^\/case\/(\d{1,9})\/$/.exec(url.pathname);
     // the page's files resolve from one level up, so a trailing slash goes to the address without it
     if (slashed) return new Response(null, { status: 301, headers: { location: `/case/${slashed[1]}` } });

@@ -154,6 +154,11 @@ h1 {
   text-wrap: balance;
 }
 
+/* a price never breaks between its number and its unit */
+.price {
+  white-space: nowrap;
+}
+
 .lede {
   margin-top: 12px;
   color: var(--ink-2);
@@ -273,11 +278,14 @@ h1 {
 
 /* ---- the three ways in ---- */
 
-/* the pill starts at the column's edge, like the tiles above it */
+/* a thin track holds the tabs, so the row keeps one left edge, the column's, whichever tab is open */
 .tabs {
   position: relative;
-  display: flex;
+  display: inline-flex;
   gap: 4px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
 }
 
 /* grey fill means selected */
@@ -285,7 +293,6 @@ h1 {
   position: absolute;
   top: 0;
   left: 0;
-  height: 100%;
   border-radius: 999px;
   background: var(--line);
   pointer-events: none;
@@ -320,14 +327,15 @@ h1 {
   transform: scale(0.97);
 }
 
-/* the three share the row on the narrowest phones */
-@media (max-width: 360px) {
+/* a phone can't fit four in a row: they sit two by two, across the column */
+@media (max-width: 640px) {
   .tabs {
-    gap: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-radius: 20px;
   }
 
   .tabs button {
-    flex: 1 1 auto;
     padding: 0 4px;
   }
 }
@@ -335,6 +343,10 @@ h1 {
 @media (hover: hover) {
   .tabs button:hover {
     color: var(--ink);
+  }
+
+  .uses > button:hover:not([aria-pressed="true"]) {
+    border-color: color-mix(in srgb, var(--tile-ink) 35%, transparent);
   }
 }
 
@@ -427,8 +439,11 @@ h1 {
 }
 
 .agent-line {
+  margin-top: 12px;
+  font-size: 14px;
   color: var(--ink-2);
-  text-wrap: pretty;
+  text-align: center;
+  text-wrap: balance;
 }
 
 .prompt-fixed {
@@ -454,29 +469,10 @@ h1 {
   line-height: 1.5;
 }
 
-/* Copy's pill sits inside the box's padding, as far from the edge as the text, and as tall as the tabs */
-.prompt .copy {
-  min-height: 36px;
-  margin-right: 0;
+.prompt-copy {
+  margin-top: 12px;
 }
 
-/* the examples on the left and Copy on the right, the box's last row */
-.prompt-end {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 8px;
-}
-
-.ideas {
-  font-size: 14px;
-  color: var(--ink-2);
-}
-
-.ideas .link {
-  color: var(--ink);
-}
 
 .code-box {
   position: relative;
@@ -559,6 +555,7 @@ h1 {
   color: var(--on-solid);
   border: 1px solid var(--solid);
   border-radius: 999px;
+  text-decoration: none;
   transition: transform 160ms var(--out);
 }
 
@@ -807,13 +804,37 @@ h1 {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
-  margin: 24px 0 0;
+  margin: 12px 0 0;
 }
 
-.uses > div {
+/* the two picks' labels, set like the steps' titles */
+.pick {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.uses + .pick {
+  margin-top: 32px;
+}
+
+.pick + .tabs {
+  margin-top: 12px;
+}
+
+/* each tile is a button: it picks the use the four ways below show; the picked one wears its color's outline */
+.uses > button {
+  display: block;
   padding: 16px;
+  border: 1px solid transparent;
   border-radius: 12px;
   background: var(--tile);
+  text-align: left;
+  transition: border-color 150ms ease;
+}
+
+.uses > button[aria-pressed="true"] {
+  border-color: var(--tile-ink);
 }
 
 .uses [data-hue="1"] {
@@ -837,17 +858,19 @@ h1 {
 }
 
 /* small type, so eight fit and every name stays on one line */
-.uses > div {
+.uses > button {
   font-size: 14px;
 }
 
-.uses dt {
+.use-name {
+  display: block;
   font-weight: 700;
   color: var(--tile-ink);
 }
 
-.uses dd {
-  margin: 2px 0 0;
+.use-line {
+  display: block;
+  margin-top: 2px;
   color: var(--ink-2);
   text-wrap: pretty;
 }
@@ -1243,7 +1266,6 @@ h1 {
   }
 
   /* with the links' 12px tap padding above and below, a 20px line makes them 44px, like every other control */
-  .ideas,
   .ask-row,
   .case-links {
     line-height: 20px;
@@ -1253,10 +1275,8 @@ h1 {
   .case-links a,
   .ask-row .link,
   .foot a,
-  .lede a,
   .frame-row a,
   .st p a,
-  .ideas .link,
   .quiet .link,
   .case-proof a,
   .case-proof .link {
@@ -1265,7 +1285,7 @@ h1 {
     margin: -12px 0;
   }
 
-  /* the footer's links sit in prose: each takes its whole line as the tap area, so lines don't overlap */
+  /* links in prose (the footer's, the headline line's IMD) take their own line as the tap area, so lines don't overlap */
   .facts dd {
     line-height: 24px;
   }
@@ -1273,10 +1293,6 @@ h1 {
   .facts a {
     padding: 0;
     margin: 0;
-  }
-
-  .prompt .copy {
-    min-height: 44px;
   }
 
   .choice button {
