@@ -14,6 +14,7 @@ import { amount, short, timeAgo, took } from "./text";
 import { copyText } from "./clipboard";
 import { useWalletSheet } from "./wallet";
 import { payWords, priceOfBuild } from "./imd-api";
+import type { Again } from "./imd-job";
 
 type Tab = "launch" | "agent" | "contract" | "ask";
 type Route = { page: "home"; tab: Tab } | { page: "case"; id: number };
@@ -204,6 +205,12 @@ function ImdBuild({ wish }: { wish: string }) {
   const { address, isConnected } = useConnection();
   const { open, isOpen } = useWalletSheet();
   const [stage, setStage] = useState<string | null>(null);
+  // while the wallet stays silent on a signature, the button asks it again
+  const [again, setAgain] = useState<Again | null>(null);
+  const onStage = (next: string, ask?: Again) => {
+    setStage(next);
+    setAgain(ask ?? null);
+  };
   const [error, setError] = useState<{ text: string; short: boolean } | null>(null);
   const [built, setBuilt] = useState<{ jobUrl: string | null } | null>(null);
   const said = useRef<HTMLParagraphElement>(null);
@@ -236,7 +243,7 @@ function ImdBuild({ wish }: { wish: string }) {
     try {
       const job = await import("./imd-job");
       try {
-        setBuilt(await job.buyBuild(config, wish, setStage, price.data ?? { pays: "imd", amount: HALF_IMD, imd: HALF_IMD }));
+        setBuilt(await job.buyBuild(config, wish, onStage, price.data ?? { pays: "imd", amount: HALF_IMD, imd: HALF_IMD }));
       } catch (e) {
         setError({ text: job.explainBuild(e), short: e instanceof job.ShortOfImd });
       }
@@ -244,6 +251,7 @@ function ImdBuild({ wish }: { wish: string }) {
       setError({ text: "This page couldn't load the payment step. Nothing was paid. Reload and try again.", short: false });
     } finally {
       setStage(null);
+      setAgain(null);
       // a swap, or a price that moved, changes what Pay asks for next
       void price.refetch();
     }
@@ -280,11 +288,15 @@ function ImdBuild({ wish }: { wish: string }) {
   return (
     <>
       <div className="prompt-copy">
-        <button className="pill" onClick={() => void go()} disabled={!!stage} aria-busy={!!stage}>
-          {stage ?? words}
+        <button className="pill" onClick={() => (again ? again.ask() : void go())} disabled={!!stage && !again} aria-busy={!!stage && !again}>
+          {again?.label ?? stage ?? words}
         </button>
       </div>
-      {error ? (
+      {again ? (
+        <p className="agent-line" role="status">
+          Nothing in your wallet? Open it, or ask again.
+        </p>
+      ) : error ? (
         <p className="agent-line ask-error" ref={said} role="alert">
           {error.text}
           {error.short && (

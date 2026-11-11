@@ -38,14 +38,67 @@ export class ShortOfImd extends Plain {}
 /** IMD's pool moved past the button's ETH before anything was sent; the page shows the new price. */
 export class PriceMoved extends Plain {}
 
+const cancelled = (error: unknown) => error instanceof BaseError && !!error.walk((e) => e instanceof UserRejectedRequestError);
+
 /** A failure in words that say whether anything was paid and what to do next. */
 export function explainBuild(error: unknown): string {
   if (error instanceof Plain) return error.message;
-  if (error instanceof BaseError) {
-    if (error.walk((e) => e instanceof UserRejectedRequestError)) return "You cancelled in your wallet. Nothing was paid.";
-    if (/insufficient funds/i.test(error.message)) return "This wallet doesn't have the ETH for gas. Nothing was paid.";
-  }
+  if (cancelled(error)) return "You cancelled in your wallet. Nothing was paid.";
+  if (error instanceof BaseError && /insufficient funds/i.test(error.message)) return "This wallet doesn't have the ETH for gas. Nothing was paid.";
   return "That didn't go through. Nothing was paid. Try again.";
+}
+
+/** The button's other job while the wallet stays silent: asking it again. */
+export type Again = { label: string; ask: () => void };
+export type OnStage = (stage: string, again?: Again) => void;
+
+/** How long a wallet asked to sign may say nothing before the button offers to ask again: longer than reading a signature takes. */
+const WALLET_SILENT_MS = 15_000;
+
+/**
+ * Signature `n` of 2. A wallet can lose a request (a window that never opened, or opened behind another) and
+ * never answer, so after a silence the button asks again. Whichever signature comes back first is used, once.
+ * A refusal counts only from the newest ask, and other failures only once every ask has failed, since an older
+ * ask may still answer. Only signatures are asked twice: one moves nothing until this page sends it.
+ */
+export function signAgainable<T>(n: 1 | 2, onStage: OnStage, sign: () => Promise<T>): Promise<T> {
+  const stage = `Sign ${n} of 2 in your wallet`;
+  return new Promise<T>((resolve, reject) => {
+    let newest = 0;
+    let waiting = 0;
+    let done = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const offer = () => onStage(stage, { label: `Ask again for signature ${n} of 2`, ask });
+    function ask() {
+      if (done) return;
+      const mine = ++newest;
+      waiting += 1;
+      onStage(stage);
+      clearTimeout(timer);
+      timer = setTimeout(() => !done && offer(), WALLET_SILENT_MS);
+      sign().then(
+        (value) => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          resolve(value);
+        },
+        (error) => {
+          waiting -= 1;
+          if (done || mine !== newest) return;
+          if (cancelled(error) || waiting === 0) {
+            done = true;
+            clearTimeout(timer);
+            reject(error);
+          } else {
+            clearTimeout(timer);
+            offer();
+          }
+        },
+      );
+    }
+    ask();
+  });
 }
 
 type Quote = {
@@ -215,7 +268,7 @@ export function inputFor(wish: string, chainId: number) {
   };
 }
 
-export async function buyBuild(config: Config, wish: string, onStage: (stage: string) => void, price: Price): Promise<Build> {
+export async function buyBuild(config: Config, wish: string, onStage: OnStage, price: Price): Promise<Build> {
   const token = tokenOf();
   const caps = (await call("capabilities", token)).json as Capabilities | null;
   const advertised = caps?.actions.find((a) => a.action === ACTION)?.payment;
@@ -252,7 +305,7 @@ class MaybePaid extends Plain {}
 async function payImd(
   config: Config,
   wish: string,
-  onStage: (stage: string) => void,
+  onStage: OnStage,
   { token, caps, chainId, asset, amount, address }: { token: string; caps: Capabilities; chainId: number; asset: Address; amount: bigint; address: Address },
 ): Promise<Build> {
   const held = await readContract(config, { chainId, address: asset, abi: erc20Abi, functionName: "balanceOf", args: [address] });
@@ -283,7 +336,7 @@ async function payImd(
   const left = order.quote.expiresAt - Math.floor(Date.now() / 1000) - 2;
   if (left < 15) throw new Plain("IMD's quote ran out before the wallet opened. Nothing was signed. Try again.");
 
-  const signer: ClientEvmSigner = { address, signTypedData: (args) => signTypedData(config, args as Parameters<typeof signTypedData>[1]) };
+  const signer: ClientEvmSigner = { address, signTypedData: (args) => signAgainable(1, onStage, () => signTypedData(config, args as Parameters<typeof signTypedData>[1])) };
   const client = x402Client.fromConfig({
     schemes: [{ network: requirements.network, client: new ExactEvmScheme(signer) }],
     spendControls: { allowedAssets: [{ network: requirements.network, asset: requirements.asset, maxAmountPerPayment: requirements.amount }] },
@@ -291,9 +344,12 @@ async function payImd(
   onStage("Sign 1 of 2 in your wallet");
   const generated = await client.createPaymentPayload({ x402Version: 2, resource: offer.resource!, accepts: [{ ...requirements, maxTimeoutSeconds: Math.min(requirements.maxTimeoutSeconds, left) }] });
   const payment = JSON.parse(JSON.stringify({ ...generated, accepted: requirements })) as PaymentPayload;
-  onStage("Sign 2 of 2 in your wallet");
-  const quoteSignature = await signTypedData(config, approvalOf(offer, payment) as Parameters<typeof signTypedData>[1]);
-  if (order.quote.expiresAt - Math.floor(Date.now() / 1000) < 8) throw new Plain("IMD's quote ran out while signing. Nothing was sent. Try again.");
+  // the signed payment lasts until its own deadline, which can come before the quote's end; IMD refuses one within 6 seconds of it
+  const deadline = Number((payment.payload as { permit2Authorization?: { deadline?: string } }).permit2Authorization?.deadline ?? order.quote.expiresAt);
+  const ranOut = () => Math.min(order.quote.expiresAt, deadline) - Math.floor(Date.now() / 1000) < 8;
+  if (ranOut()) throw new Plain("IMD's quote ran out while signing. Nothing was sent. Try again.");
+  const quoteSignature = await signAgainable(2, onStage, () => signTypedData(config, approvalOf(offer, payment) as Parameters<typeof signTypedData>[1]));
+  if (ranOut()) throw new Plain("IMD's quote ran out while signing. Nothing was sent. Try again.");
 
   onStage("Sending…");
   // From here IMD may hold the payment, so only IMD's own answer can say nothing was paid.
