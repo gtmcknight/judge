@@ -56,6 +56,13 @@ export type OnStage = (stage: string, again?: Again) => void;
 const WALLET_SILENT_MS = 15_000;
 
 /**
+ * Rainbow closes its window just after a signature, and a request that arrives meanwhile is filed under the
+ * closing window and never shown (it stays pending with nothing on screen). So the second signature waits
+ * until the first one's window is gone, and the wallet opens a new one for it.
+ */
+const BETWEEN_SIGNATURES_MS = 1_500;
+
+/**
  * Signature `n` of 2. A wallet can lose a request (a window that never opened, or opened behind another) and
  * never answer, so after a silence the button asks again. Whichever signature comes back first is used, once.
  * A refusal counts only from the newest ask, and other failures only once every ask has failed, since an older
@@ -347,6 +354,8 @@ async function payImd(
   // the signed payment lasts until its own deadline, which can come before the quote's end; IMD refuses one within 6 seconds of it
   const deadline = Number((payment.payload as { permit2Authorization?: { deadline?: string } }).permit2Authorization?.deadline ?? order.quote.expiresAt);
   const ranOut = () => Math.min(order.quote.expiresAt, deadline) - Math.floor(Date.now() / 1000) < 8;
+  onStage("Sign 2 of 2 in your wallet");
+  await new Promise((resolve) => setTimeout(resolve, BETWEEN_SIGNATURES_MS));
   if (ranOut()) throw new Plain("IMD's quote ran out while signing. Nothing was sent. Try again.");
   const quoteSignature = await signAgainable(2, onStage, () => signTypedData(config, approvalOf(offer, payment) as Parameters<typeof signTypedData>[1]));
   if (ranOut()) throw new Plain("IMD's quote ran out while signing. Nothing was sent. Try again.");
