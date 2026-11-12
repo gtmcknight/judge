@@ -11,7 +11,7 @@ export const USES = [
     line: "Pay out when the result is official.",
     hue: 1,
     prompt: "Build me a prediction market where people bet ETH on whether GTA 6 is released before Dec 31, 2026. A yes answer pays the yes side. If no yes answer lands by Jan 7, 2027, the no side wins.",
-    ask: { rule: "Was GTA 6 released on or before Dec 31, 2026?", proof: "https://www.rockstargames.com/newswire" },
+    ask: { rule: "Was GTA 6 released on or before Dec 31, 2026? Only a page on apnews.com, bbc.com or rockstargames.com/newswire counts.", proof: "https://www.rockstargames.com/newswire" },
     code: EXAMPLE_CODE.PredictionMarket,
   },
   {

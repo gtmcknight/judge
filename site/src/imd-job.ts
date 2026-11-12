@@ -27,7 +27,9 @@ const RELEASE = "The requester chose this release: source code published to GitH
 const SITE =
   "Build and test the contracts, have another agent give them an independent security review, then deploy them on Ethereum mainnet. " +
   "Also build a website for it and host it on IPFS at a public URL, and publish all the source code on GitHub. " +
-  "The site shows the contract's state and lets a connected wallet do everything the contract offers.";
+  "Keep the site to one simple screen: what it does in plain words, the numbers people need, and one button for the next step. " +
+  "Near that button, show the exact question the agents will be asked and which sites count as proof, so people can judge it before they put money in. " +
+  "Show any other action only when it can be used, and put the contract details behind one link.";
 
 /** A message for the reader, as it is. Anything else is shown as a short, plain failure. */
 export class Plain extends Error {}
