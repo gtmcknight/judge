@@ -15,6 +15,7 @@ import { copyText } from "./clipboard";
 import { useWalletSheet } from "./wallet";
 import { payWords, priceOfBuild } from "./imd-api";
 import type { Again } from "./imd-job";
+import { Blanks, type Ready } from "./Blanks";
 
 type Tab = "launch" | "agent" | "contract" | "ask";
 type Route = { page: "home"; tab: Tab } | { page: "case"; id: number };
@@ -160,10 +161,10 @@ export function CopyButton({ text, label, next, wide, onCopied }: { text: string
 let wishDraft: { use: number; text: string } | null = null;
 
 /**
- * The words box: the fixed line that points at the skill, then what you want in your own words. The
- * same words go to your AI (Copy) or to IMD (Pay), so both tabs share what was typed.
+ * For your agent's words box: the fixed line that points at the skill, then what you want in your own
+ * words, for your AI to build. Your AI can ask who "alice" is; Launch it can't, so it asks in blanks.
  */
-function Prompt({ use, then }: { use: number; then: "copy" | "launch" }) {
+function Prompt({ use }: { use: number }) {
   const [wish, setShown] = useState(() => (wishDraft?.use === use ? wishDraft.text : USES[use]!.prompt));
   const setWish = (text: string) => {
     wishDraft = { use, text };
@@ -185,22 +186,16 @@ function Prompt({ use, then }: { use: number; then: "copy" | "launch" }) {
         </p>
         <textarea ref={box} rows={1} aria-label="What you want your contract to do" spellCheck={false} value={wish} onChange={(event) => setWish(event.target.value)} />
       </div>
-      {then === "copy" ? (
-        <>
-          <div className="prompt-copy">
-            <CopyButton text={`Read and follow ${skill}\n\n${wish}`} label="Copy this for your AI" wide />
-          </div>
-          <p className="agent-line">Paste this into Claude Code, Cursor or any AI that writes code.</p>
-        </>
-      ) : (
-        <ImdBuild wish={wish} />
-      )}
+      <div className="prompt-copy">
+        <CopyButton text={`Read and follow ${skill}\n\n${wish}`} label="Copy this for your AI" wide />
+      </div>
+      <p className="agent-line">Paste this into Claude Code, Cursor or any AI that writes code.</p>
     </>
   );
 }
 
-/** Launch it: the same words, sent from this page to IMD's swarm as a paid build-and-launch job. */
-function ImdBuild({ wish }: { wish: string }) {
+/** Launch it's Pay: the blanks, checked before the wallet opens, sent to IMD's swarm as a paid build-and-launch job. */
+function ImdBuild({ ready }: { ready: Ready }) {
   const config = useConfig();
   const { address, isConnected } = useConnection();
   const { open, isOpen } = useWalletSheet();
@@ -211,7 +206,8 @@ function ImdBuild({ wish }: { wish: string }) {
     setStage(next);
     setAgain(ask ?? null);
   };
-  const [error, setError] = useState<{ text: string; short: boolean } | null>(null);
+  // `blanks`: what's missing, said again as the blanks change, so it never names one already filled
+  const [error, setError] = useState<{ text: string; short: boolean; blanks?: boolean } | null>(null);
   const [built, setBuilt] = useState<{ jobUrl: string | null } | null>(null);
   const said = useRef<HTMLParagraphElement>(null);
 
@@ -234,16 +230,26 @@ function ImdBuild({ wish }: { wish: string }) {
   const go = async () => {
     if (stage) return;
     setError(null);
-    if (!wish.trim()) return setError({ text: "Say what to build in the box above first.", short: false });
-    if (!isConnected) {
+    const problem = ready.check();
+    if (problem) {
+      setError({ text: problem.text, short: false, blanks: true });
+      return problem.focus();
+    }
+    if (!isConnected || !address) {
       setAfterConnect(words);
       return open();
     }
     setStage("Starting…");
     try {
+      let request: string;
+      try {
+        request = await ready.request(address);
+      } catch (e) {
+        return setError({ text: e instanceof Error ? e.message : "A name in the blanks didn't resolve. Use the 0x address instead.", short: false });
+      }
       const job = await import("./imd-job");
       try {
-        setBuilt(await job.buyBuild(config, wish, onStage, price.data ?? { pays: "imd", amount: HALF_IMD, imd: HALF_IMD }));
+        setBuilt(await job.buyBuild(config, request, onStage, price.data ?? { pays: "imd", amount: HALF_IMD, imd: HALF_IMD }));
       } catch (e) {
         setError({ text: job.explainBuild(e), short: e instanceof job.ShortOfImd });
       }
@@ -268,6 +274,9 @@ function ImdBuild({ wish }: { wish: string }) {
     setAfterConnect(null);
     if (payWords(price.data) === afterConnect) void carryOn.current();
   }, [afterConnect, isConnected, isOpen, price.data, price.isPlaceholderData, price.isFetching]);
+
+  const missing = error?.blanks ? ready.missing() : null;
+  const shown = error?.blanks ? (missing ? { ...error, text: missing } : null) : error;
 
   if (built) {
     return (
@@ -296,10 +305,10 @@ function ImdBuild({ wish }: { wish: string }) {
         <p className="agent-line" role="status">
           Nothing in your wallet? Open it, or ask again.
         </p>
-      ) : error ? (
+      ) : shown ? (
         <p className="agent-line ask-error" ref={said} role="alert">
-          {error.text}
-          {error.short && (
+          {shown.text}
+          {shown.short && (
             <>
               {" "}
               <a href="https://imd.fun/buy/">Get IMD</a>
@@ -401,16 +410,18 @@ function Tabs({ tab }: { tab: Tab }) {
 function AgentSteps({ use }: { use: number }) {
   return (
     <div className="agent">
-      <Prompt key={use} use={use} then="copy" />
+      <Prompt key={use} use={use} />
     </div>
   );
 }
 
-/** The same box, and IMD builds, audits and launches it instead of your AI. */
+/** The use as a sentence with blanks, and IMD builds, audits and launches it. */
 function LaunchSteps({ use }: { use: number }) {
   return (
     <div className="agent launch">
-      <Prompt key={use} use={use} then="launch" />
+      <Blanks key={use} use={use}>
+        {(ready) => <ImdBuild ready={ready} />}
+      </Blanks>
     </div>
   );
 }

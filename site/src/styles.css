@@ -473,6 +473,52 @@ h1 {
   margin-top: 12px;
 }
 
+/* ---- Launch it: the use as a sentence with blanks ---- */
+
+.blanks {
+  font-size: 16px;
+  line-height: 2.25;
+}
+
+/* a blank: a line to write on, as wide as what's on it, with the site's focus ring */
+.blank {
+  /* wide enough to tap with one figure in it, and room beside it for the full stop */
+  min-width: 3ch;
+  max-width: calc(100% - 1ch);
+  padding: 0;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--ink-2);
+  border-radius: 0;
+  font: inherit;
+  line-height: 1.5;
+  color: var(--ink);
+  field-sizing: content;
+  transition: border-color 150ms ease;
+}
+
+.blank::placeholder {
+  color: var(--ink-2);
+  opacity: 0.8;
+}
+
+.blank:focus {
+  border-bottom-color: var(--ink);
+}
+
+/* the site's ring, close in, so it doesn't run into the words beside it */
+.blank:focus-visible {
+  outline-offset: 0;
+}
+
+.blank-end {
+  white-space: nowrap;
+}
+
+.blank[aria-invalid="true"] {
+  border-bottom-color: var(--no);
+}
+
 
 .code-box {
   position: relative;
